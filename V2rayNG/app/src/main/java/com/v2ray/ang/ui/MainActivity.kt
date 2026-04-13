@@ -81,6 +81,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         binding.drawerLayout.addDrawerListener(toggle)
         toggle.syncState()
         binding.navView.setNavigationItemSelectedListener(this)
+        updateBackToSimpleNavVisibility()
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
@@ -108,6 +109,17 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
 
         checkAndRequestPermission(PermissionType.POST_NOTIFICATIONS) {
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        updateBackToSimpleNavVisibility()
+    }
+
+    private fun updateBackToSimpleNavVisibility() {
+        binding.navView.menu.findItem(R.id.back_to_simple)?.isVisible =
+            intent.getBooleanExtra(SimpleMainActivity.EXTRA_FROM_SIMPLE, false)
     }
 
     private fun setupViewModel() {
@@ -633,6 +645,12 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
         // Handle navigation view item clicks here.
         when (item.itemId) {
+            R.id.back_to_simple -> {
+                startActivity(
+                    Intent(this, SimpleMainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                )
+                finish()
+            }
             R.id.sub_setting -> requestActivityLauncher.launch(Intent(this, SubSettingActivity::class.java))
             R.id.per_app_proxy_settings -> requestActivityLauncher.launch(Intent(this, PerAppProxyActivity::class.java))
             R.id.routing_setting -> requestActivityLauncher.launch(Intent(this, RoutingSettingActivity::class.java))
@@ -640,7 +658,6 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
             R.id.settings -> requestActivityLauncher.launch(Intent(this, SettingsActivity::class.java))
             R.id.promotion -> Utils.openUri(this, "${Utils.decode(AppConfig.APP_PROMOTION_URL)}?t=${System.currentTimeMillis()}")
             R.id.logcat -> startActivity(Intent(this, LogcatActivity::class.java))
-            R.id.check_for_update -> startActivity(Intent(this, CheckUpdateActivity::class.java))
             R.id.backup_restore -> requestActivityLauncher.launch(Intent(this, BackupActivity::class.java))
             R.id.about -> startActivity(Intent(this, AboutActivity::class.java))
         }

@@ -437,6 +437,7 @@
     <string name="babuk_share_debug_log">Отправить отладочный лог</string>
     <string name="babuk_share_debug_failed">Не удалось подготовить файл лога.</string>
     <string name="babuk_advanced_mode">Расширенный режим</string>
+    <string name="babuk_back_to_simple">К простому экрану</string>
     <string name="babuk_simple_status_refreshing">Обновление списка серверов…</string>
     <string name="babuk_simple_status_no_servers">Серверы не загрузились. Проверьте сеть и откройте приложение снова.</string>
     <string name="babuk_simple_status_ready">Готово. Включите переключатель.</string>
