@@ -24,9 +24,9 @@ class AngApplication : MultiDexApplication() {
         application = this
     }
 
-    private val workManagerConfiguration: Configuration = Configuration.Builder()
-        .setDefaultProcessName("${AppConfig.ANG_PACKAGE}:bg")
-        .build()
+    // Do not force `:bg` — pool refresh + UI shared MMKV/import must not race in two processes
+    // (Mutex is per-process; RemoteWorkManager + :bg caused double import and broken selection).
+    private val workManagerConfiguration: Configuration = Configuration.Builder().build()
 
     /**
      * Initializes the application.

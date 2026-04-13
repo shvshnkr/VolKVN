@@ -53,6 +53,8 @@ object AppConfig {
     const val BABUK_PUBLIC_POOL_WORK_NAME = "babuk_public_pool_refresh"
     /** User accepted third-party pool / VPN risks on first launch (simple UI gate). */
     const val PREF_BABUK_CONSENT_ACCEPTED = "pref_babuk_consent_accepted"
+    /** Wall-clock ms of last public pool fetch; cross-call debounce (main process only after WM fix). */
+    const val PREF_BABUK_LAST_POOL_REFRESH_AT = "pref_babuk_last_pool_refresh_at"
 
     val BABUK_SUBSCRIPTION_URLS: Array<String> = arrayOf(
         "https://mifa.world/vless",
