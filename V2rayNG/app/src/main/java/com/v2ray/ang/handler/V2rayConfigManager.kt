@@ -373,29 +373,12 @@ object V2rayConfigManager {
     private fun getInbounds(v2rayConfig: V2rayConfig): Boolean {
         try {
             val socksPort = SettingsManager.getSocksPort()
-            val socksUsername = SettingsManager.getSocksUsername()
-            val socksPassword = SettingsManager.getSocksPassword()
             val inbound1 = v2rayConfig.inbounds[0]
-            if (inbound1.settings == null) {
-                inbound1.settings = V2rayConfig.InboundBean.InSettingsBean()
-            }
 
             if (MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING) != true) {
                 inbound1.listen = AppConfig.LOOPBACK
             }
             inbound1.port = socksPort
-            if (socksUsername != null && socksPassword != null) {
-                inbound1.settings?.auth = "password"
-                inbound1.settings?.accounts = listOf(
-                    V2rayConfig.InboundBean.InSettingsBean.SocksAccountBean(
-                        user = socksUsername,
-                        pass = socksPassword
-                    )
-                )
-            } else {
-                inbound1.settings?.auth = "noauth"
-                inbound1.settings?.accounts = null
-            }
             val fakedns = MmkvManager.decodeSettingsBool(AppConfig.PREF_FAKE_DNS_ENABLED) == true
             val sniffAllTlsAndHttp =
                 MmkvManager.decodeSettingsBool(AppConfig.PREF_SNIFFING_ENABLED, true) != false
@@ -409,12 +392,22 @@ object V2rayConfigManager {
                 inbound1.sniffing?.destOverride?.add("fakedns")
             }
 
-            if (!Utils.isXray()) {
-                val inbound2 = JsonUtil.fromJson(JsonUtil.toJson(inbound1), V2rayConfig.InboundBean::class.java) ?: return false
-                inbound2.tag = EConfigType.HTTP.name.lowercase()
-                inbound2.port = SettingsManager.getHttpPort()
-                inbound2.protocol = EConfigType.HTTP.name.lowercase()
-                v2rayConfig.inbounds.add(inbound2)
+            val inbound2 = JsonUtil.fromJson(JsonUtil.toJson(inbound1), V2rayConfig.InboundBean::class.java) ?: return false
+            inbound2.tag = EConfigType.HTTP.name.lowercase()
+            inbound2.port = SettingsManager.getHttpPort()
+            inbound2.protocol = EConfigType.HTTP.name.lowercase()
+            inbound2.settings = V2rayConfig.InboundBean.InSettingsBean(
+                userLevel = AppConfig.DEFAULT_LEVEL,
+            )
+            v2rayConfig.inbounds.add(inbound2)
+
+            if (inbound1.protocol.equals("socks", ignoreCase = true)) {
+                inbound1.settings = V2rayConfig.InboundBean.InSettingsBean(
+                    auth = "noauth",
+                    udp = true,
+                    userLevel = AppConfig.DEFAULT_LEVEL,
+                    accounts = null,
+                )
             }
 
             if (needTun()) {

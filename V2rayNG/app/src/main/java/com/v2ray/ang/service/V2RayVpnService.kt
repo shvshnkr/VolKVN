@@ -21,6 +21,7 @@ import com.v2ray.ang.AppConfig.LOOPBACK
 import com.v2ray.ang.BuildConfig
 import com.v2ray.ang.contracts.ServiceControl
 import com.v2ray.ang.contracts.Tun2SocksControl
+import com.v2ray.ang.handler.LocalSocksAuth
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.NotificationManager
 import com.v2ray.ang.handler.SettingsManager
@@ -93,26 +94,12 @@ class V2RayVpnService : VpnService(), ServiceControl {
     override fun onDestroy() {
         super.onDestroy()
         Log.i(AppConfig.TAG, "StartCore-VPN: Service destroyed")
-
-        // Ensure VPN interface is properly closed when the service is destroyed without
-        // going through stopAllService() (e.g. when killed unexpectedly). isRunning is
-        // set to false at the start of stopAllService(), so this guard prevents a double-close.
-        if (isRunning) {
-            try {
-                if (::mInterface.isInitialized) {
-                    mInterface.close()
-                    Log.i(AppConfig.TAG, "StartCore-VPN: VPN interface closed in onDestroy")
-                }
-            } catch (e: Exception) {
-                Log.e(AppConfig.TAG, "StartCore-VPN: Failed to close interface in onDestroy", e)
-            }
-        }
-
         NotificationManager.cancelNotification()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(AppConfig.TAG, "StartCore-VPN: Service command received")
+        LocalSocksAuth.clear()
         setupVpnService()
         startService()
         return START_STICKY
@@ -371,19 +358,9 @@ class V2RayVpnService : VpnService(), ServiceControl {
             //which means the first v2ray core somehow failed to stop and release the port.
             stopSelf()
 
-            // Add a small delay to allow the async core stop operation to complete
-            // before closing the VPN interface, preventing a race condition that can
-            // leave the VPN icon in the status bar after stopping the service.
-            try {
-                Thread.sleep(100)
-            } catch (e: InterruptedException) {
-                Log.w(AppConfig.TAG, "StartCore-VPN: Sleep interrupted", e)
-            }
-
             try {
                 if (::mInterface.isInitialized) {
                     mInterface.close()
-                    Log.i(AppConfig.TAG, "StartCore-VPN: VPN interface closed")
                 }
             } catch (e: Exception) {
                 Log.e(AppConfig.TAG, "StartCore-VPN: Failed to close interface", e)

@@ -7,6 +7,7 @@ import android.os.IBinder
 import android.util.Log
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.contracts.ServiceControl
+import com.v2ray.ang.handler.LocalSocksAuth
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.V2RayServiceManager
 import com.v2ray.ang.util.MyContextWrapper
@@ -31,6 +32,7 @@ class V2RayProxyOnlyService : Service(), ServiceControl {
      */
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(AppConfig.TAG, "StartCore-Proxy: Service command received")
+        LocalSocksAuth.clear()
         V2RayServiceManager.startCoreLoop(null)
         return START_STICKY
     }

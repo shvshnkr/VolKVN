@@ -288,8 +288,9 @@ object SettingsManager {
      * Get the HTTP port.
      * @return The HTTP port.
      */
+    /** Always SOCKS+1 (e.g. 10808 / 10809). Xray previously used +0 here, which collided SOCKS and HTTP. */
     fun getHttpPort(): Int {
-        return getSocksPort() + if (Utils.isXray()) 0 else 1
+        return getSocksPort() + 1
     }
 
     /**
