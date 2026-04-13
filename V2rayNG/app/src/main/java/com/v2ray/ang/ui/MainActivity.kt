@@ -69,6 +69,13 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         setContentView(binding.root)
         setupToolbar(binding.toolbar, false, getString(R.string.title_server))
 
+        binding.btnHomeSimple.setOnClickListener {
+            startActivity(
+                Intent(this, SimpleMainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            )
+            finish()
+        }
+
         // setup viewpager and tablayout
         groupPagerAdapter = GroupPagerAdapter(this, emptyList())
         binding.viewPager.adapter = groupPagerAdapter
@@ -112,8 +119,9 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     }
 
     private fun updateBackToSimpleNavVisibility() {
-        binding.navView.menu.findItem(R.id.back_to_simple)?.isVisible =
-            intent.getBooleanExtra(SimpleMainActivity.EXTRA_FROM_SIMPLE, false)
+        val fromSimple = intent.getBooleanExtra(SimpleMainActivity.EXTRA_FROM_SIMPLE, false)
+        binding.navView.menu.findItem(R.id.back_to_simple)?.isVisible = fromSimple
+        binding.btnHomeSimple.isVisible = fromSimple
     }
 
     private fun setupViewModel() {

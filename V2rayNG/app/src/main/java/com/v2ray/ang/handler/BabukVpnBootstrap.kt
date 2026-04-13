@@ -45,7 +45,7 @@ object BabukVpnBootstrap {
 
             ensurePublicPoolSubscription(context)
             val merged = StringBuilder()
-            for (raw in AppConfig.BABUK_SUBSCRIPTION_URLS) {
+            for (raw in allPoolSourceUrls(context)) {
                 val url = HttpUtil.toIdnUrl(raw.trim())
                 val body = HttpUtil.getUrlContent(url, 30000) ?: continue
                 val lines = body.count { it == '\n' } + 1
@@ -84,12 +84,31 @@ object BabukVpnBootstrap {
     }
 
     /**
+     * Built-in URLs plus optional user lines from [AppConfig.PREF_BABUK_USER_POOL_URLS] (http/https only, deduped).
+     */
+    fun allPoolSourceUrls(context: Context): List<String> {
+        val user = MmkvManager.decodeSettingsString(AppConfig.PREF_BABUK_USER_POOL_URLS, "").orEmpty()
+            .lines()
+            .map { it.trim() }
+            .filter { it.startsWith("http://", ignoreCase = true) || it.startsWith("https://", ignoreCase = true) }
+        val merged = ArrayList<String>(AppConfig.BABUK_SUBSCRIPTION_URLS.size + user.size)
+        val seen = HashSet<String>()
+        for (u in AppConfig.BABUK_SUBSCRIPTION_URLS) {
+            if (seen.add(u)) merged.add(u)
+        }
+        for (u in user) {
+            if (seen.add(u)) merged.add(u)
+        }
+        return merged
+    }
+
+    /**
      * Registers the pool in the subscription list (named group for built-in pool).
      */
     fun ensurePublicPoolSubscription(context: Context) {
         val item = SubscriptionItem(
             remarks = context.getString(R.string.babuk_subscription_remarks),
-            url = AppConfig.BABUK_SUBSCRIPTION_URLS.joinToString("\n"),
+            url = allPoolSourceUrls(context).joinToString("\n"),
             enabled = true,
             autoUpdate = true,
         )

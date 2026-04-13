@@ -55,16 +55,18 @@ object AppConfig {
     const val PREF_BABUK_LAST_POOL_REFRESH_AT = "pref_babuk_last_pool_refresh_at"
 
     /**
-     * Public pool sources, fetched in order; bodies concatenated then dedup-imported in
-     * [BabukVpnBootstrap.refreshServersAndSelectBest].
-     * - [https://mifa.world/vless] — primary site list (“mifa”).
-     * - GitHub raw URLs whose path contains **swordware** (mirrors of the Swordware feed).
+     * Built-in public pool sources (always included). User-added URLs live in [PREF_BABUK_USER_POOL_URLS].
+     * Fetched in order; bodies concatenated then dedup-imported in [BabukVpnBootstrap.refreshServersAndSelectBest].
      */
     val BABUK_SUBSCRIPTION_URLS: Array<String> = arrayOf(
         "https://mifa.world/vless",
         "https://raw.githubusercontent.com/mbelspb-gif/ffsfsfssdf/refs/heads/main/TG-swordware",
         "https://raw.githubusercontent.com/mbelspb-gif/dddddad/refs/heads/main/Swordware.txt",
+        "https://raw.githubusercontent.com/zieng2/wl/main/vless_lite.txt",
     )
+
+    /** Newline-separated extra subscription URLs (raw lists), merged with [BABUK_SUBSCRIPTION_URLS]. */
+    const val PREF_BABUK_USER_POOL_URLS = "pref_babuk_user_pool_urls"
     const val PREF_SPEED_ENABLED = "pref_speed_enabled"
     const val PREF_CONFIRM_REMOVE = "pref_confirm_remove"
     const val PREF_START_SCAN_IMMEDIATE = "pref_start_scan_immediate"

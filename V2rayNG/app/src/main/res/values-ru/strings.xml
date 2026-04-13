@@ -438,6 +438,13 @@
     <string name="babuk_share_debug_failed">Не удалось подготовить файл лога.</string>
     <string name="babuk_advanced_mode">Расширенный режим</string>
     <string name="babuk_back_to_simple">К простому экрану</string>
+    <string name="babuk_pool_settings_category">Пул серверов VolKVN</string>
+    <string name="babuk_pool_sources_pref_title">Дополнительные URL подписок</string>
+    <string name="babuk_pool_sources_pref_summary">Сырьевые списки, по одному URL в строке; объединяются со встроенными источниками</string>
+    <string name="babuk_pool_sources_title">Дополнительные URL пула</string>
+    <string name="babuk_pool_sources_hint">По одной HTTPS-ссылке на строку. Загружаются вместе со встроенными списками VolKVN и сливаются в общий пул.</string>
+    <string name="babuk_pool_sources_save">Сохранить и обновить пул</string>
+    <string name="babuk_pool_sources_saved">Пул обновлён</string>
     <string name="babuk_simple_status_refreshing">Обновление списка серверов…</string>
     <string name="babuk_simple_status_no_servers">Серверы не загрузились. Проверьте сеть и откройте приложение снова.</string>
     <string name="babuk_simple_status_ready">Готово. Включите переключатель.</string>

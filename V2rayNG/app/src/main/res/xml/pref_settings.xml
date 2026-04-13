@@ -309,4 +309,12 @@
 
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="@string/babuk_pool_settings_category">
+        <Preference
+            android:key="pref_babuk_open_pool_sources"
+            android:icon="@drawable/ic_cloud_download_24dp"
+            android:summary="@string/babuk_pool_sources_pref_summary"
+            android:title="@string/babuk_pool_sources_pref_title" />
+    </PreferenceCategory>
+
 </PreferenceScreen>
