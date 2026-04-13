@@ -396,18 +396,45 @@ object V2rayConfigManager {
             inbound2.tag = EConfigType.HTTP.name.lowercase()
             inbound2.port = SettingsManager.getHttpPort()
             inbound2.protocol = EConfigType.HTTP.name.lowercase()
+
+            val lpUser = LocalSocksAuth.username()
+            val lpPass = LocalSocksAuth.password()
+            val localCred = lpUser.isNotEmpty() && lpPass.isNotEmpty()
+            val account = if (localCred) {
+                listOf(
+                    V2rayConfig.InboundBean.InSettingsBean.SocksInboundAccountBean(
+                        user = lpUser,
+                        pass = lpPass,
+                        level = AppConfig.DEFAULT_LEVEL,
+                    ),
+                )
+            } else {
+                null
+            }
+
             inbound2.settings = V2rayConfig.InboundBean.InSettingsBean(
                 userLevel = AppConfig.DEFAULT_LEVEL,
+                accounts = account,
             )
             v2rayConfig.inbounds.add(inbound2)
 
             if (inbound1.protocol.equals("socks", ignoreCase = true)) {
-                inbound1.settings = V2rayConfig.InboundBean.InSettingsBean(
-                    auth = "noauth",
-                    udp = true,
-                    userLevel = AppConfig.DEFAULT_LEVEL,
-                    accounts = null,
-                )
+                inbound1.settings = if (localCred) {
+                    V2rayConfig.InboundBean.InSettingsBean(
+                        auth = "password",
+                        udp = true,
+                        userLevel = AppConfig.DEFAULT_LEVEL,
+                        accounts = account,
+                    )
+                } else {
+                    Log.w(AppConfig.TAG, "LocalSocksAuth empty: inbound falls back to noauth (call regenerate before config)")
+                    V2rayConfig.InboundBean.InSettingsBean(
+                        auth = "noauth",
+                        udp = true,
+                        userLevel = AppConfig.DEFAULT_LEVEL,
+                        accounts = null,
+                    )
+                }
             }
 
             if (needTun()) {

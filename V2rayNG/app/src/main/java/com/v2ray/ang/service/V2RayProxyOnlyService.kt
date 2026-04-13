@@ -32,7 +32,7 @@ class V2RayProxyOnlyService : Service(), ServiceControl {
      */
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(AppConfig.TAG, "StartCore-Proxy: Service command received")
-        LocalSocksAuth.clear()
+        LocalSocksAuth.regenerate()
         V2RayServiceManager.startCoreLoop(null)
         return START_STICKY
     }

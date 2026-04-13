@@ -242,6 +242,7 @@ object V2RayServiceManager {
 
         MessageUtil.sendMsg2UI(service, AppConfig.MSG_STATE_STOP_SUCCESS, "")
         NotificationManager.cancelNotification()
+        LocalSocksAuth.clear()
 
         try {
             service.unregisterReceiver(mMsgReceive)
