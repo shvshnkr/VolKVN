@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">VolKVN</string>
+    <string name="app_name" translatable="false">ВолшебныйКВН</string>
     <string name="app_widget_name">Switch</string>
     <string name="app_tile_name">Switch</string>
     <string name="app_tile_first_use">First use of this feature, please use the app to add server</string>
@@ -438,30 +438,30 @@
         <item>WebDAV</item>
     </string-array>
 
-    <string name="babuk_simple_title">ВолшебныйКВН</string>
-    <string name="babuk_simple_switch_label">Turn on</string>
-    <string name="babuk_simple_footer">VolKVN for Telegram, WhatsApp, and YouTube</string>
-    <string name="babuk_share_debug_log">Share debug log</string>
-    <string name="babuk_share_debug_failed">Could not prepare the log file.</string>
-    <string name="babuk_advanced_mode">Advanced</string>
-    <string name="babuk_back_to_simple">Back to simple screen</string>
-    <string name="babuk_pool_settings_category">VolKVN server pool</string>
-    <string name="babuk_pool_sources_pref_title">Extra subscription URLs</string>
-    <string name="babuk_pool_sources_pref_summary">Add raw list links (one per line), merged with built-in sources</string>
-    <string name="babuk_pool_sources_title">Extra pool URLs</string>
-    <string name="babuk_pool_sources_hint">One HTTPS link per line. They are fetched together with the built-in VolKVN lists and merged into the public pool.</string>
-    <string name="babuk_pool_sources_save">Save and refresh pool</string>
-    <string name="babuk_pool_sources_saved">Pool updated</string>
-    <string name="babuk_simple_status_refreshing">Updating server list…</string>
-    <string name="babuk_simple_status_no_servers">No servers loaded yet. Check network and try reopening the app.</string>
-    <string name="babuk_simple_status_ready">Ready. Toggle to connect.</string>
-    <string name="babuk_simple_status_on">Connected</string>
-    <string name="babuk_simple_status_off">Disconnected</string>
-    <string name="babuk_simple_no_profile">No server selected. Wait for the list to update.</string>
-    <string name="babuk_subscription_remarks">VolKVN public pool</string>
-    <string name="babuk_err_no_server_selected">No profile selected. Wait until the list updates.</string>
-    <string name="babuk_err_decode_config">Could not read the selected profile. Try updating the list.</string>
-    <string name="babuk_err_invalid_server_address">Invalid server address in profile: %1$s</string>
-    <string name="babuk_err_start_foreground">Could not start the background service: %1$s. Grant notifications permission if the system asks.</string>
+    <string name="volkvn_simple_title">ВолшебныйКВН</string>
+    <string name="volkvn_simple_switch_label">Turn on</string>
+    <string name="volkvn_simple_footer">Restores Telegram, WhatsApp, and YouTube</string>
+    <string name="volkvn_share_debug_log">Share debug log</string>
+    <string name="volkvn_share_debug_failed">Could not prepare the log file.</string>
+    <string name="volkvn_advanced_mode">Advanced</string>
+    <string name="volkvn_back_to_simple">Back to simple screen</string>
+    <string name="volkvn_pool_settings_category">VolKVN server pool</string>
+    <string name="volkvn_pool_sources_pref_title">Extra subscription URLs</string>
+    <string name="volkvn_pool_sources_pref_summary">Add raw list links (one per line), merged with built-in sources</string>
+    <string name="volkvn_pool_sources_title">Extra pool URLs</string>
+    <string name="volkvn_pool_sources_hint">One HTTPS link per line. They are fetched together with the built-in VolKVN lists and merged into the public pool.</string>
+    <string name="volkvn_pool_sources_save">Save and refresh pool</string>
+    <string name="volkvn_pool_sources_saved">Pool updated</string>
+    <string name="volkvn_simple_status_refreshing">Updating server list…</string>
+    <string name="volkvn_simple_status_no_servers">No servers loaded yet. Check network and try reopening the app.</string>
+    <string name="volkvn_simple_status_ready">Ready. Toggle to connect.</string>
+    <string name="volkvn_simple_status_on">Connected</string>
+    <string name="volkvn_simple_status_off">Disconnected</string>
+    <string name="volkvn_simple_no_profile">No server selected. Wait for the list to update.</string>
+    <string name="volkvn_subscription_remarks">VolKVN public pool</string>
+    <string name="volkvn_err_no_server_selected">No profile selected. Wait until the list updates.</string>
+    <string name="volkvn_err_decode_config">Could not read the selected profile. Try updating the list.</string>
+    <string name="volkvn_err_invalid_server_address">Invalid server address in profile: %1$s</string>
+    <string name="volkvn_err_start_foreground">Could not start the background service: %1$s. Grant notifications permission if the system asks.</string>
 
 </resources>

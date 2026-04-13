@@ -24,6 +24,7 @@ import com.v2ray.ang.extension.serializable
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.AngConfigManager
+import com.v2ray.ang.handler.VolkvnDebugLog
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SpeedtestManager
@@ -49,14 +50,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val tcpingTestScope by lazy { CoroutineScope(Dispatchers.IO) }
 
     /**
+     * After [AppConfig.MSG_STATE_STOP_SUCCESS], `:RunSoLibV2RayDaemon` can still appear in [ActivityManager] briefly.
+     * While false, do not use process presence to force [isRunning] true (would block reconnect: switch already "on").
+     */
+    private var trustDaemonProcessForOptimisticUi: Boolean = true
+
+    /**
      * Refer to the official documentation for [registerReceiver](https://developer.android.com/reference/androidx/core/content/ContextCompat#registerReceiver(android.content.Context,android.content.BroadcastReceiver,android.content.IntentFilter,int):
      * `registerReceiver(Context, BroadcastReceiver, IntentFilter, int)`.
      */
     fun startListenBroadcast() {
-        isRunning.value = false
+        // Never read V2RayServiceManager.isRunning() here: core runs in :RunSoLibV2RayDaemon; UI process coreController stays false.
         val mFilter = IntentFilter(AppConfig.BROADCAST_ACTION_ACTIVITY)
         ContextCompat.registerReceiver(getApplication(), mMsgReceiver, mFilter, Utils.receiverFlags())
-        MessageUtil.sendMsg2Service(getApplication(), AppConfig.MSG_REGISTER_CLIENT, "")
+        queryServiceRunningState()
+    }
+
+    /**
+     * Re-sync toggle: ask daemon; in VPN mode trust [Utils.isVpnTransportActive] (our :RunSoLibV2RayDaemon only) when daemon sends NOT_RUNNING.
+     */
+    fun queryServiceRunningState() {
+        val app = getApplication<AngApplication>()
+        val vpnUp =
+            SettingsManager.isVpnMode() &&
+                Utils.isVpnTransportActive(app) &&
+                trustDaemonProcessForOptimisticUi
+        VolkvnDebugLog.log(
+            app,
+            "MainVM",
+            "queryServiceRunningState vpnMode=${SettingsManager.isVpnMode()} trustDaemon=$trustDaemonProcessForOptimisticUi vpnUp=$vpnUp runningLive=${isRunning.value} ${Utils.vpnUiDiagnostics(app)}",
+        )
+        if (vpnUp) {
+            isRunning.value = true
+        }
+        MessageUtil.sendMsg2Service(app, AppConfig.MSG_REGISTER_CLIENT, "")
     }
 
     /**
@@ -444,25 +471,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         override fun onReceive(ctx: Context?, intent: Intent?) {
             when (intent?.getIntExtra("key", 0)) {
                 AppConfig.MSG_STATE_RUNNING -> {
+                    trustDaemonProcessForOptimisticUi = true
                     isRunning.value = true
+                    VolkvnDebugLog.log(getApplication(), "MainVM", "broadcast RUNNING")
                 }
 
                 AppConfig.MSG_STATE_NOT_RUNNING -> {
-                    isRunning.value = false
+                    val app = getApplication<AngApplication>()
+                    val live =
+                        SettingsManager.isVpnMode() &&
+                            Utils.isVpnTransportActive(app) &&
+                            trustDaemonProcessForOptimisticUi
+                    isRunning.value = live
+                    VolkvnDebugLog.log(app, "MainVM", "broadcast NOT_RUNNING live=$live ${Utils.vpnUiDiagnostics(app)}")
                 }
 
                 AppConfig.MSG_STATE_START_SUCCESS -> {
+                    trustDaemonProcessForOptimisticUi = true
                     getApplication<AngApplication>().toastSuccess(R.string.toast_services_success)
                     isRunning.value = true
+                    VolkvnDebugLog.log(getApplication(), "MainVM", "broadcast START_SUCCESS")
                 }
 
                 AppConfig.MSG_STATE_START_FAILURE -> {
+                    trustDaemonProcessForOptimisticUi = false
                     getApplication<AngApplication>().toastError(R.string.toast_services_failure)
                     isRunning.value = false
+                    VolkvnDebugLog.log(getApplication(), "MainVM", "broadcast START_FAILURE")
                 }
 
                 AppConfig.MSG_STATE_STOP_SUCCESS -> {
+                    trustDaemonProcessForOptimisticUi = false
                     isRunning.value = false
+                    VolkvnDebugLog.log(getApplication(), "MainVM", "broadcast STOP_SUCCESS")
                 }
 
                 AppConfig.MSG_MEASURE_DELAY_SUCCESS -> {

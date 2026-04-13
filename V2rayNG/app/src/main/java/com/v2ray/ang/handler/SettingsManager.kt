@@ -37,6 +37,7 @@ object SettingsManager {
 
     fun initApp(context: Context) {
         ensureDefaultSettings()
+        migrateVolkvnDisableHevTunnel()
         //ensureDefaultSubscription()
         initRoutingRulesets(context)
         migrateServerListToSubscriptions()
@@ -276,14 +277,6 @@ object SettingsManager {
         return Utils.parseInt(MmkvManager.decodeSettingsString(AppConfig.PREF_SOCKS_PORT), AppConfig.PORT_SOCKS.toInt())
     }
 
-    fun getSocksUsername(): String? {
-        return MmkvManager.decodeSettingsString(AppConfig.PREF_SOCKS_USERNAME)?.trim()?.takeIf { it.isNotEmpty() }
-    }
-
-    fun getSocksPassword(): String? {
-        return MmkvManager.decodeSettingsString(AppConfig.PREF_SOCKS_PASSWORD)?.trim()?.takeIf { it.isNotEmpty() }
-    }
-
     /**
      * Get the HTTP port.
      * @return The HTTP port.
@@ -430,7 +423,7 @@ object SettingsManager {
      * @return True if HEV TUN is used, false otherwise.
      */
     fun isUsingHevTun(): Boolean {
-        return MmkvManager.decodeSettingsBool(AppConfig.PREF_USE_HEV_TUNNEL, true)
+        return MmkvManager.decodeSettingsBool(AppConfig.PREF_USE_HEV_TUNNEL, false)
     }
 
     /**
@@ -467,6 +460,19 @@ object SettingsManager {
         if (MmkvManager.decodeSettingsString(key).isNullOrEmpty()) {
             MmkvManager.encodeSettings(key, default)
         }
+    }
+
+    /** VolKVN: APK does not bundle libhev-socks5-tunnel.so; turn off hev tun once for older prefs / upstream default. */
+    private fun migrateVolkvnDisableHevTunnel() {
+        val keyNew = "volkvn_hev_tunnel_off_migrated_v1"
+        // Stored by older builds; value must match on-disk MMKV.
+        val keyLegacy = "babuk_hev_tunnel_off_migrated_v1"
+        if (MmkvManager.decodeSettingsBool(keyNew, false) || MmkvManager.decodeSettingsBool(keyLegacy, false)) {
+            MmkvManager.encodeSettings(keyNew, true)
+            return
+        }
+        MmkvManager.encodeSettings(AppConfig.PREF_USE_HEV_TUNNEL, false)
+        MmkvManager.encodeSettings(keyNew, true)
     }
 
     private fun migrateHysteria2PinSHA256() {

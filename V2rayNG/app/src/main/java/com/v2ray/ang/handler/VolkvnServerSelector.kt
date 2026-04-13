@@ -13,9 +13,9 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 
-object BabukServerSelector {
+object VolkvnServerSelector {
 
-    private const val TAG = "BabukServerSelector"
+    private const val TAG = "VolkvnServerSelector"
     /** Cellular / DNS can be slow; too short → false negatives. */
     private const val PROBE_TIMEOUT_MS = 4000
     /** First wave: how many profiles to TCP-probe (shuffled order). */

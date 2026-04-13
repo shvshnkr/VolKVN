@@ -126,7 +126,7 @@ object V2rayConfigManager {
             val msg =
                 "inbounds(${inbounds.size()}): ${sb.toString().trim()}$suffix udsMode=${useUnixSocketForAppPrivateLocalInbounds()}"
             Log.i(AppConfig.TAG, "V2rayCfg $msg")
-            BabukDebugLog.log(context.applicationContext, "V2rayCfg", msg)
+            VolkvnDebugLog.log(context.applicationContext, "V2rayCfg", msg)
         } catch (e: Exception) {
             Log.w(AppConfig.TAG, "logV2rayInboundSummary failed", e)
         }
@@ -510,7 +510,7 @@ object V2rayConfigManager {
                 val note =
                     "local SOCKS/HTTP: TCP loopback (VPN + built-in TUN incompatible with UDS on this core)"
                 Log.i(AppConfig.TAG, "V2rayCfg $note")
-                BabukDebugLog.log(appCtx, "V2rayCfg", note)
+                VolkvnDebugLog.log(appCtx, "V2rayCfg", note)
             }
 
             if (useUds) {
@@ -523,7 +523,7 @@ object V2rayConfigManager {
                 val udsMsg =
                     "uds prep socks=${socksSock.absolutePath} http=${httpSock.absolutePath} (stale deleted)"
                 Log.i(AppConfig.TAG, "V2rayCfg $udsMsg")
-                BabukDebugLog.log(appCtx, "V2rayCfg", udsMsg)
+                VolkvnDebugLog.log(appCtx, "V2rayCfg", udsMsg)
                 inbound2.settings = V2rayConfig.InboundBean.InSettingsBean(
                     userLevel = AppConfig.DEFAULT_LEVEL,
                 )

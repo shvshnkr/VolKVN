@@ -11,10 +11,10 @@ import java.util.Date
 import java.util.Locale
 
 /** File log in cache for sharing (VolKVN). */
-object BabukDebugLog {
+object VolkvnDebugLog {
 
-    private const val TAG = "BabukDebugLog"
-    const val FILE_NAME = "babuk_debug.txt"
+    private const val TAG = "VolkvnDebugLog"
+    const val FILE_NAME = "volkvn_debug.txt"
     private const val MAX_BYTES = 512_000
     private const val KEEP_AFTER_TRIM = 400_000
     private const val MAX_EXPORT_COPIES = 18
@@ -79,7 +79,7 @@ object BabukDebugLog {
     private fun pruneOldExports(cacheDir: File) {
         try {
             val exports = cacheDir.listFiles { child ->
-                child.isFile && child.name.startsWith("babuk_debug_") && child.name.endsWith(".txt") && child.name != FILE_NAME
+                child.isFile && child.name.startsWith("volkvn_debug_") && child.name.endsWith(".txt") && child.name != FILE_NAME
             } ?: return
             if (exports.size <= MAX_EXPORT_COPIES) return
             exports.sortedBy { it.lastModified() }.take(exports.size - MAX_EXPORT_COPIES).forEach { it.delete() }
@@ -93,10 +93,10 @@ object BabukDebugLog {
             val cacheDir = app.cacheDir
             val f = File(cacheDir, FILE_NAME)
             if (!f.exists()) {
-                log(context, "BabukDebug", "share requested but log empty; stub line")
+                log(context, "VolkvnDebug", "share requested but log empty; stub line")
             }
             val stamp = fileStampFormat.format(Date())
-            val shareName = "babuk_debug_v${BuildConfig.VERSION_CODE}_$stamp.txt"
+            val shareName = "volkvn_debug_v${BuildConfig.VERSION_CODE}_$stamp.txt"
             val shareFile = File(cacheDir, shareName)
             f.copyTo(shareFile, overwrite = true)
             pruneOldExports(cacheDir)

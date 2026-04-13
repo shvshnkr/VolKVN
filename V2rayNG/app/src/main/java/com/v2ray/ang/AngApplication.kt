@@ -5,8 +5,9 @@ import androidx.multidex.MultiDexApplication
 import androidx.work.Configuration
 import androidx.work.WorkManager
 import com.tencent.mmkv.MMKV
-import com.v2ray.ang.handler.BabukVpnBootstrap
+import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
+import com.v2ray.ang.handler.VolkvnVpnBootstrap
 
 class AngApplication : MultiDexApplication() {
     companion object {
@@ -38,9 +39,10 @@ class AngApplication : MultiDexApplication() {
         WorkManager.initialize(this, workManagerConfiguration)
 
         // Ensure critical preference defaults are present in MMKV early
+        MmkvManager.migrateLegacyPublicPoolStorageIfNeeded()
         SettingsManager.initApp(this)
         SettingsManager.setNightMode()
-        BabukVpnBootstrap.schedulePublicPoolWorker()
+        VolkvnVpnBootstrap.schedulePublicPoolWorker()
 
         es.dmoral.toasty.Toasty.Config.getInstance()
             .setGravity(android.view.Gravity.BOTTOM, 0, 300)

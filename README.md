@@ -1,32 +1,58 @@
-# v2rayNG
+# VolKVN
 
-A V2Ray client for Android, support [Xray core](https://github.com/XTLS/Xray-core) and [v2fly core](https://github.com/v2fly/v2ray-core)
+Android client based on [v2rayNG](https://github.com/2dust/v2rayNG) (GPLv3) with a **simple mode** for relatives: one switch, public VLESS subscription pools, automatic server pick, and per-app split tunneling toward Telegram, WhatsApp, and YouTube (plus Revanced YouTube when installed).
 
-[![API](https://img.shields.io/badge/API-24%2B-yellow.svg?style=flat)](https://developer.android.com/about/versions/lollipop)
-[![Kotlin Version](https://img.shields.io/badge/Kotlin-2.3.0-blue.svg)](https://kotlinlang.org)
-[![GitHub commit activity](https://img.shields.io/github/commit-activity/m/2dust/v2rayNG)](https://github.com/2dust/v2rayNG/commits/master)
-[![CodeFactor](https://www.codefactor.io/repository/github/2dust/v2rayng/badge)](https://www.codefactor.io/repository/github/2dust/v2rayng)
-[![GitHub Releases](https://img.shields.io/github/downloads/2dust/v2rayNG/latest/total?logo=github)](https://github.com/2dust/v2rayNG/releases)
-[![Chat on Telegram](https://img.shields.io/badge/Chat%20on-Telegram-brightgreen.svg)](https://t.me/v2rayn)
+Application id: `com.volkvn.app` (debug/release). Uninstall any older build signed with a different id before installing.
 
-### Telegram Channel
-[github_2dust](https://t.me/github_2dust)
+## Compared to upstream v2rayNG
 
-### Usage
+- **Local SOCKS auth**: each VPN session uses random SOCKS5 username/password on the loopback inbound and matching credentials in `hev-socks5-tunnel` (UDP relay mode `tcp`). This addresses the loopback SOCKS exposure discussed in [this article](https://habr.com/ru/articles/1020080/) (see also [POC](https://github.com/runetfreedom/per-app-split-bypass-poc)).
+- **Public pool**: bundled URLs are fetched periodically (WorkManager minimum interval 60 minutes), merged, deduplicated by upstream import logic, then a **TCP connect latency** probe picks among the fastest endpoints (random among top three).
+- **Consent gate**: first launch shows risks of unknown servers before any simple UI.
+- **Advanced mode**: full v2rayNG `MainActivity` remains available from the simple screen.
 
-#### Geoip and Geosite
-- geoip.dat and geosite.dat files are in `Android/data/com.v2ray.ang/files/assets` (path may differ on some Android device)
-- download feature will get enhanced version in this [repo](https://github.com/Loyalsoldier/v2ray-rules-dat) (Note it need a working proxy)
-- latest official [domain list](https://github.com/Loyalsoldier/v2ray-rules-dat) and [ip list](https://github.com/Loyalsoldier/geoip) can be imported manually
-- possible to use third party dat file in the same folder, like [h2y](https://guide.v2fly.org/routing/sitedata.html#%E5%A4%96%E7%BD%AE%E7%9A%84%E5%9F%9F%E5%90%8D%E6%96%87%E4%BB%B6)
+## Build
 
-### More in our [wiki](https://github.com/2dust/v2rayNG/wiki)
+1. **Android SDK** — full SDK (not only platform-tools): `platforms;android-36`, `build-tools`, **cmdline-tools**, then `sdkmanager --licenses`. Set `sdk.dir` in `V2rayNG/local.properties` (example: `sdk.dir=C:/Android/sdk`).
+2. **`libv2ray.aar`** — not stored in git. Download the asset matching [AndroidLibXrayLite releases](https://github.com/2dust/AndroidLibXrayLite/releases) (file `libv2ray.aar`) into `V2rayNG/app/libs/`. Upstream CI uses the tag from the `AndroidLibXrayLite` submodule.
+3. **JDK 17** and Gradle: `cd V2rayNG` then:
 
-### Development guide
+```bash
+./gradlew assemblePlaystoreDebug
+```
 
-Android project under V2rayNG folder can be compiled directly in Android Studio, or using Gradle wrapper. But the v2ray core inside the aar is (probably) outdated.  
-The aar can be compiled from the Golang project [AndroidLibV2rayLite](https://github.com/2dust/AndroidLibV2rayLite) or [AndroidLibXrayLite](https://github.com/2dust/AndroidLibXrayLite).
-For a quick start, read guide for [Go Mobile](https://github.com/golang/go/wiki/Mobile) and [Makefiles for Go Developers](https://tutorialedge.net/golang/makefiles-for-go-developers/)
+Release signing is up to you. F-Droid flavor uses `applicationIdSuffix ".fdroid"`.
 
-v2rayNG can run on Android Emulators. For WSA, VPN permission need to be granted via
-`appops set [package name] ACTIVATE_VPN allow`
+### Debug logs (send to developer)
+
+USB debugging on, device connected. Examples:
+
+**Linux / macOS (bash):**
+
+```bash
+adb logcat --pid=$(adb shell pidof -s com.volkvn.app)
+```
+
+**Windows (cmd):**
+
+```bat
+adb shell pidof com.volkvn.app
+adb logcat --pid=PASTE_PID_HERE
+```
+
+Or capture a wide filter:
+
+```bat
+adb logcat | findstr /i "volkvn com.volkvn.app GoLog"
+```
+
+Copy lines from pressing Connect until the error appears.
+
+## Legal
+
+- This repository is a **derivative of v2rayNG** and remains under **GNU GPLv3** (see upstream license).
+- Public subscription URLs point to **third-party** configurations; you are responsible for compliance with local law and provider terms.
+
+## Distribution
+
+Google Play policy for VPN apps is strict; sideload APK or F-Droid-style distribution is the practical path.

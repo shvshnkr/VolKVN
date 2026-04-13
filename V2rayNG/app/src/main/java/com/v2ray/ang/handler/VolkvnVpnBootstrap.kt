@@ -21,9 +21,9 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
-object BabukVpnBootstrap {
+object VolkvnVpnBootstrap {
 
-    private const val TAG = "BabukVpnBootstrap"
+    private const val TAG = "VolkvnVpnBootstrap"
     private val refreshMutex = Mutex()
 
     /**
@@ -37,9 +37,9 @@ object BabukVpnBootstrap {
     suspend fun refreshServersAndSelectBest(context: Context) = refreshMutex.withLock {
         withContext(Dispatchers.IO) {
             val nowWall = System.currentTimeMillis()
-            val lastWall = MmkvManager.decodeSettingsLong(AppConfig.PREF_BABUK_LAST_POOL_REFRESH_AT, 0L)
+            val lastWall = MmkvManager.decodeSettingsLong(AppConfig.PREF_VOLKVN_LAST_POOL_REFRESH_AT, 0L)
             if (lastWall > 0L && nowWall - lastWall < 4000L) {
-                BabukDebugLog.log(context, TAG, "refresh: skip debounce ${nowWall - lastWall}ms")
+                VolkvnDebugLog.log(context, TAG, "refresh: skip debounce ${nowWall - lastWall}ms")
                 return@withContext
             }
 
@@ -55,45 +55,45 @@ object BabukVpnBootstrap {
             val text = merged.toString().trim()
             if (text.isEmpty()) {
                 Log.w(TAG, "No subscription content fetched")
-                BabukDebugLog.log(context, TAG, "refresh: no subscription content")
+                VolkvnDebugLog.log(context, TAG, "refresh: no subscription content")
                 return@withContext
             }
-            val (count, _) = AngConfigManager.importBatchConfig(text, AppConfig.BABUK_SUBSCRIPTION_ID, append = false)
+            val (count, _) = AngConfigManager.importBatchConfig(text, AppConfig.VOLKVN_SUBSCRIPTION_ID, append = false)
             Log.i(TAG, "Imported $count endpoints from public pool")
-            BabukDebugLog.log(context, TAG, "refresh: imported $count endpoints")
+            VolkvnDebugLog.log(context, TAG, "refresh: imported $count endpoints")
             if (count <= 0) return@withContext
 
-            MmkvManager.encodeSettings(AppConfig.PREF_BABUK_LAST_POOL_REFRESH_AT, System.currentTimeMillis())
+            MmkvManager.encodeSettings(AppConfig.PREF_VOLKVN_LAST_POOL_REFRESH_AT, System.currentTimeMillis())
 
-            val subId = AppConfig.BABUK_SUBSCRIPTION_ID
+            val subId = AppConfig.VOLKVN_SUBSCRIPTION_ID
             val selected = MmkvManager.getSelectServer()
             val guids = MmkvManager.decodeServerList(subId)
             val vpnUp = Utils.isVpnTransportActive(context.applicationContext)
             val needPick = selected.isNullOrBlank() || selected !in guids || !vpnUp
             if (needPick) {
-                BabukServerSelector.pickBestServer(subId)
-                BabukDebugLog.log(
+                VolkvnServerSelector.pickBestServer(subId)
+                VolkvnDebugLog.log(
                     context,
                     TAG,
                     "refresh: pickBestServer (vpnUp=$vpnUp needPick reasons: blank=${selected.isNullOrBlank()} missing=${selected != null && selected !in guids})",
                 )
             } else {
-                BabukDebugLog.log(context, TAG, "refresh: keep selection guid=$selected (${guids.size} in pool)")
+                VolkvnDebugLog.log(context, TAG, "refresh: keep selection guid=$selected (${guids.size} in pool)")
             }
         }
     }
 
     /**
-     * Built-in URLs plus optional user lines from [AppConfig.PREF_BABUK_USER_POOL_URLS] (http/https only, deduped).
+     * Built-in URLs plus optional user lines from [AppConfig.PREF_VOLKVN_USER_POOL_URLS] (http/https only, deduped).
      */
     fun allPoolSourceUrls(context: Context): List<String> {
-        val user = MmkvManager.decodeSettingsString(AppConfig.PREF_BABUK_USER_POOL_URLS, "").orEmpty()
+        val user = MmkvManager.decodeSettingsString(AppConfig.PREF_VOLKVN_USER_POOL_URLS, "").orEmpty()
             .lines()
             .map { it.trim() }
             .filter { it.startsWith("http://", ignoreCase = true) || it.startsWith("https://", ignoreCase = true) }
-        val merged = ArrayList<String>(AppConfig.BABUK_SUBSCRIPTION_URLS.size + user.size)
+        val merged = ArrayList<String>(AppConfig.VOLKVN_SUBSCRIPTION_URLS.size + user.size)
         val seen = HashSet<String>()
-        for (u in AppConfig.BABUK_SUBSCRIPTION_URLS) {
+        for (u in AppConfig.VOLKVN_SUBSCRIPTION_URLS) {
             if (seen.add(u)) merged.add(u)
         }
         for (u in user) {
@@ -107,13 +107,13 @@ object BabukVpnBootstrap {
      */
     fun ensurePublicPoolSubscription(context: Context) {
         val item = SubscriptionItem(
-            remarks = context.getString(R.string.babuk_subscription_remarks),
+            remarks = context.getString(R.string.volkvn_subscription_remarks),
             url = allPoolSourceUrls(context).joinToString("\n"),
             enabled = true,
             autoUpdate = true,
         )
-        MmkvManager.encodeSubscription(AppConfig.BABUK_SUBSCRIPTION_ID, item)
-        MmkvManager.encodeSettings(AppConfig.CACHE_SUBSCRIPTION_ID, AppConfig.BABUK_SUBSCRIPTION_ID)
+        MmkvManager.encodeSubscription(AppConfig.VOLKVN_SUBSCRIPTION_ID, item)
+        MmkvManager.encodeSettings(AppConfig.CACHE_SUBSCRIPTION_ID, AppConfig.VOLKVN_SUBSCRIPTION_ID)
     }
 
     fun schedulePublicPoolWorker() {
@@ -121,19 +121,19 @@ object BabukVpnBootstrap {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
-        val req = PeriodicWorkRequestBuilder<BabukPublicPoolWorker>(60, TimeUnit.MINUTES)
+        val req = PeriodicWorkRequestBuilder<VolkvnPublicPoolWorker>(60, TimeUnit.MINUTES)
             .setConstraints(constraints)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.MINUTES)
             .build()
         rw.enqueueUniquePeriodicWork(
-            AppConfig.BABUK_PUBLIC_POOL_WORK_NAME,
+            AppConfig.VOLKVN_PUBLIC_POOL_WORK_NAME,
             ExistingPeriodicWorkPolicy.UPDATE,
             req
         )
     }
 
     /**
-     * Simple mode: split tunnel (per-app allowlist) — same defaults as stable 1.0.3-babuk; hev-tun off (no bundled .so).
+     * Simple mode: split tunnel (per-app allowlist); hev-tun off (no bundled .so).
      */
     fun applySimpleModeDefaults(context: Context) {
         ensurePublicPoolSubscription(context)
@@ -162,7 +162,7 @@ object BabukVpnBootstrap {
         if (allowed.isNotEmpty()) {
             MmkvManager.encodeSettings(AppConfig.PREF_PER_APP_PROXY_SET, allowed)
         }
-        BabukDebugLog.log(
+        VolkvnDebugLog.log(
             context,
             TAG,
             "applySimpleModeDefaults hev=false perApp=true packages=${allowed.size}: ${allowed.joinToString()}",

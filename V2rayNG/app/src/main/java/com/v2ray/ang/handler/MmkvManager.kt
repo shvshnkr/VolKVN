@@ -4,6 +4,10 @@ import com.tencent.mmkv.MMKV
 import com.v2ray.ang.AppConfig.DEFAULT_SUBSCRIPTION_ID
 import com.v2ray.ang.AppConfig.PREF_IS_BOOTED
 import com.v2ray.ang.AppConfig.PREF_ROUTING_RULESET
+import com.v2ray.ang.AppConfig.CACHE_SUBSCRIPTION_ID
+import com.v2ray.ang.AppConfig.PREF_VOLKVN_LAST_POOL_REFRESH_AT
+import com.v2ray.ang.AppConfig.PREF_VOLKVN_USER_POOL_URLS
+import com.v2ray.ang.AppConfig.VOLKVN_SUBSCRIPTION_ID
 import com.v2ray.ang.dto.AssetUrlCache
 import com.v2ray.ang.dto.AssetUrlItem
 import com.v2ray.ang.dto.ProfileItem
@@ -714,6 +718,63 @@ object MmkvManager {
     fun decodeWebDavConfig(): WebDavConfig? {
         val json = mainStorage.decodeString(KEY_WEBDAV_CONFIG) ?: return null
         return JsonUtil.fromJson(json, WebDavConfig::class.java)
+    }
+
+    //endregion
+
+    //region VolKVN migration (older app builds used different MMKV keys)
+
+    /** Previous subscription id on disk (must match old builds for one-time import). */
+    private const val LEGACY_MM_SUBSCRIPTION_ID = "__babuk_public__"
+    private const val LEGACY_MM_PREF_LAST_POOL_REFRESH_AT = "pref_babuk_last_pool_refresh_at"
+    private const val LEGACY_MM_PREF_USER_POOL_URLS = "pref_babuk_user_pool_urls"
+
+    /**
+     * Copies public-pool subscription, server list, and prefs from legacy storage keys once.
+     */
+    fun migrateLegacyPublicPoolStorageIfNeeded() {
+        migrateLegacySubscriptionIdIfNeeded()
+        migrateLegacyPoolPrefsIfNeeded()
+    }
+
+    private fun migrateLegacySubscriptionIdIfNeeded() {
+        if (decodeSubscription(VOLKVN_SUBSCRIPTION_ID) != null) return
+        val oldItem = decodeSubscription(LEGACY_MM_SUBSCRIPTION_ID) ?: return
+        val guids = decodeServerList(LEGACY_MM_SUBSCRIPTION_ID)
+        for (guid in guids) {
+            val p = decodeServerConfig(guid) ?: continue
+            p.subscriptionId = VOLKVN_SUBSCRIPTION_ID
+            encodeProfileDirect(guid, JsonUtil.toJson(p))
+        }
+        encodeServerList(guids.toMutableList(), VOLKVN_SUBSCRIPTION_ID)
+        encodeSubscription(VOLKVN_SUBSCRIPTION_ID, oldItem)
+        encodeServerList(mutableListOf(), LEGACY_MM_SUBSCRIPTION_ID)
+        subStorage.remove(LEGACY_MM_SUBSCRIPTION_ID)
+        val subs = decodeSubsList()
+        if (subs.remove(LEGACY_MM_SUBSCRIPTION_ID)) {
+            encodeSubsList(subs)
+        }
+        val cached = decodeSettingsString(CACHE_SUBSCRIPTION_ID, "").orEmpty()
+        if (cached == LEGACY_MM_SUBSCRIPTION_ID) {
+            encodeSettings(CACHE_SUBSCRIPTION_ID, VOLKVN_SUBSCRIPTION_ID)
+        }
+    }
+
+    private fun migrateLegacyPoolPrefsIfNeeded() {
+        val lastNew = decodeSettingsLong(PREF_VOLKVN_LAST_POOL_REFRESH_AT, 0L)
+        if (lastNew == 0L) {
+            val lastOld = decodeSettingsLong(LEGACY_MM_PREF_LAST_POOL_REFRESH_AT, 0L)
+            if (lastOld > 0L) {
+                encodeSettings(PREF_VOLKVN_LAST_POOL_REFRESH_AT, lastOld)
+            }
+        }
+        val urlsNew = decodeSettingsString(PREF_VOLKVN_USER_POOL_URLS, "").orEmpty()
+        if (urlsNew.isBlank()) {
+            val urlsOld = decodeSettingsString(LEGACY_MM_PREF_USER_POOL_URLS, "").orEmpty()
+            if (urlsOld.isNotBlank()) {
+                encodeSettings(PREF_VOLKVN_USER_POOL_URLS, urlsOld)
+            }
+        }
     }
 
     //endregion

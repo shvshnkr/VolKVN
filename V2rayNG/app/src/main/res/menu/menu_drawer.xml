@@ -7,7 +7,7 @@
         <item
             android:id="@+id/back_to_simple"
             android:icon="@drawable/ic_simple_home_24dp"
-            android:title="@string/babuk_back_to_simple"
+            android:title="@string/volkvn_back_to_simple"
             android:visible="false" />
         <item
             android:id="@+id/sub_setting"
