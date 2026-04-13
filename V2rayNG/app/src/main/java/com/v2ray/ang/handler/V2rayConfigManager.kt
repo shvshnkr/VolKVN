@@ -3,6 +3,7 @@ package com.v2ray.ang.handler
 import android.content.Context
 import android.text.TextUtils
 import android.util.Log
+import java.io.File
 import com.google.gson.JsonArray
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.dto.ConfigResult
@@ -32,6 +33,15 @@ import com.v2ray.ang.util.Utils
 object V2rayConfigManager {
     private var initConfigCache: String? = null
     private var initConfigCacheWithTun: String? = null
+
+    /**
+     * Bind SOCKS/HTTP to Unix sockets under [Context.getFilesDir] (0700): other apps cannot open them
+     * (same approach as libbox/sing-box-style stacks). Disabled for LAN sharing or hev-tun (TCP to loopback only).
+     */
+    fun useUnixSocketForAppPrivateLocalInbounds(): Boolean {
+        return MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING) != true &&
+            !SettingsManager.isUsingHevTun()
+    }
 
     //region get config function
 
@@ -195,7 +205,7 @@ object V2rayConfigManager {
         v2rayConfig.log.loglevel = MmkvManager.decodeSettingsString(AppConfig.PREF_LOGLEVEL) ?: "warning"
         v2rayConfig.remarks = config.remarks
 
-        getInbounds(v2rayConfig)
+        getInbounds(context, v2rayConfig)
 
         getOutbounds(v2rayConfig, config) ?: return result
         getMoreOutbounds(v2rayConfig, config.subscriptionId)
@@ -241,7 +251,7 @@ object V2rayConfigManager {
         v2rayConfig.log.loglevel = MmkvManager.decodeSettingsString(AppConfig.PREF_LOGLEVEL) ?: "warning"
         v2rayConfig.remarks = config.remarks
 
-        getInbounds(v2rayConfig)
+        getInbounds(context, v2rayConfig)
 
         v2rayConfig.outbounds.removeAt(0)
         val outboundsList = mutableListOf<OutboundBean>()
@@ -367,18 +377,19 @@ object V2rayConfigManager {
      *
      * This function sets up the listening ports, sniffing options, and other inbound-related configurations.
      *
+     * @param context Used for app-private Unix socket paths when [useUnixSocketForAppPrivateLocalInbounds].
      * @param v2rayConfig The V2ray configuration object to be modified
      * @return true if inbound configuration was successful, false otherwise
      */
-    private fun getInbounds(v2rayConfig: V2rayConfig): Boolean {
+    private fun getInbounds(context: Context, v2rayConfig: V2rayConfig): Boolean {
         try {
             val socksPort = SettingsManager.getSocksPort()
             val inbound1 = v2rayConfig.inbounds[0]
+            val useUds = useUnixSocketForAppPrivateLocalInbounds()
+            val appCtx = context.applicationContext
+            val socksSock = File(appCtx.filesDir, AppConfig.LOCAL_SOCKS_UNIX_FILENAME)
+            val httpSock = File(appCtx.filesDir, AppConfig.LOCAL_HTTP_UNIX_FILENAME)
 
-            if (MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING) != true) {
-                inbound1.listen = AppConfig.LOOPBACK
-            }
-            inbound1.port = socksPort
             val fakedns = MmkvManager.decodeSettingsBool(AppConfig.PREF_FAKE_DNS_ENABLED) == true
             val sniffAllTlsAndHttp =
                 MmkvManager.decodeSettingsBool(AppConfig.PREF_SNIFFING_ENABLED, true) != false
@@ -394,48 +405,75 @@ object V2rayConfigManager {
 
             val inbound2 = JsonUtil.fromJson(JsonUtil.toJson(inbound1), V2rayConfig.InboundBean::class.java) ?: return false
             inbound2.tag = EConfigType.HTTP.name.lowercase()
-            inbound2.port = SettingsManager.getHttpPort()
             inbound2.protocol = EConfigType.HTTP.name.lowercase()
 
-            val lpUser = LocalSocksAuth.username()
-            val lpPass = LocalSocksAuth.password()
-            val localCred = lpUser.isNotEmpty() && lpPass.isNotEmpty()
-            val account = if (localCred) {
-                listOf(
-                    V2rayConfig.InboundBean.InSettingsBean.SocksInboundAccountBean(
-                        user = lpUser,
-                        pass = lpPass,
-                        level = AppConfig.DEFAULT_LEVEL,
-                    ),
+            if (useUds) {
+                socksSock.delete()
+                httpSock.delete()
+                inbound1.listen = socksSock.absolutePath
+                inbound1.port = 0
+                inbound2.listen = httpSock.absolutePath
+                inbound2.port = 0
+                inbound2.settings = V2rayConfig.InboundBean.InSettingsBean(
+                    userLevel = AppConfig.DEFAULT_LEVEL,
                 )
-            } else {
-                null
-            }
-
-            inbound2.settings = V2rayConfig.InboundBean.InSettingsBean(
-                userLevel = AppConfig.DEFAULT_LEVEL,
-                accounts = account,
-            )
-            v2rayConfig.inbounds.add(inbound2)
-
-            if (inbound1.protocol.equals("socks", ignoreCase = true)) {
-                inbound1.settings = if (localCred) {
-                    V2rayConfig.InboundBean.InSettingsBean(
-                        auth = "password",
-                        udp = true,
-                        userLevel = AppConfig.DEFAULT_LEVEL,
-                        accounts = account,
-                    )
-                } else {
-                    Log.w(AppConfig.TAG, "LocalSocksAuth empty: inbound falls back to noauth (call regenerate before config)")
-                    V2rayConfig.InboundBean.InSettingsBean(
+                if (inbound1.protocol.equals("socks", ignoreCase = true)) {
+                    inbound1.settings = V2rayConfig.InboundBean.InSettingsBean(
                         auth = "noauth",
                         udp = true,
                         userLevel = AppConfig.DEFAULT_LEVEL,
                         accounts = null,
                     )
                 }
+            } else {
+                if (MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING) != true) {
+                    inbound1.listen = AppConfig.LOOPBACK
+                    inbound2.listen = AppConfig.LOOPBACK
+                }
+                inbound1.port = socksPort
+                inbound2.port = SettingsManager.getHttpPort()
+
+                val lpUser = LocalSocksAuth.username()
+                val lpPass = LocalSocksAuth.password()
+                val localCred = lpUser.isNotEmpty() && lpPass.isNotEmpty()
+                val account = if (localCred) {
+                    listOf(
+                        V2rayConfig.InboundBean.InSettingsBean.SocksInboundAccountBean(
+                            user = lpUser,
+                            pass = lpPass,
+                            level = AppConfig.DEFAULT_LEVEL,
+                        ),
+                    )
+                } else {
+                    null
+                }
+
+                inbound2.settings = V2rayConfig.InboundBean.InSettingsBean(
+                    userLevel = AppConfig.DEFAULT_LEVEL,
+                    accounts = account,
+                )
+
+                if (inbound1.protocol.equals("socks", ignoreCase = true)) {
+                    inbound1.settings = if (localCred) {
+                        V2rayConfig.InboundBean.InSettingsBean(
+                            auth = "password",
+                            udp = true,
+                            userLevel = AppConfig.DEFAULT_LEVEL,
+                            accounts = account,
+                        )
+                    } else {
+                        Log.w(AppConfig.TAG, "LocalSocksAuth empty: inbound falls back to noauth (call regenerate before config)")
+                        V2rayConfig.InboundBean.InSettingsBean(
+                            auth = "noauth",
+                            udp = true,
+                            userLevel = AppConfig.DEFAULT_LEVEL,
+                            accounts = null,
+                        )
+                    }
+                }
             }
+
+            v2rayConfig.inbounds.add(inbound2)
 
             if (needTun()) {
                 val inboundTun = v2rayConfig.inbounds.firstOrNull { e -> e.tag == "tun" }

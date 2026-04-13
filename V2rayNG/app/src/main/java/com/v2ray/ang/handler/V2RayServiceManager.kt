@@ -18,6 +18,7 @@ import com.v2ray.ang.service.V2RayProxyOnlyService
 import com.v2ray.ang.service.V2RayVpnService
 import com.v2ray.ang.util.MessageUtil
 import com.v2ray.ang.util.Utils
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -243,6 +244,12 @@ object V2RayServiceManager {
         MessageUtil.sendMsg2UI(service, AppConfig.MSG_STATE_STOP_SUCCESS, "")
         NotificationManager.cancelNotification()
         LocalSocksAuth.clear()
+        try {
+            File(service.filesDir, AppConfig.LOCAL_SOCKS_UNIX_FILENAME).delete()
+            File(service.filesDir, AppConfig.LOCAL_HTTP_UNIX_FILENAME).delete()
+        } catch (e: Exception) {
+            Log.w(AppConfig.TAG, "local inbound socket cleanup", e)
+        }
 
         try {
             service.unregisterReceiver(mMsgReceive)
