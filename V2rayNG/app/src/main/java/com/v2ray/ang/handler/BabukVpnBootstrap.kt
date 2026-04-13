@@ -15,37 +15,54 @@ import com.v2ray.ang.R
 import com.v2ray.ang.dto.SubscriptionItem
 import com.v2ray.ang.util.HttpUtil
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 object BabukVpnBootstrap {
 
     private const val TAG = "BabukVpnBootstrap"
+    private val refreshMutex = Mutex()
 
     /**
      * One-shot refresh used from UI and worker.
+     * Does **not** call [BabukServerSelector.pickBestServer] if the current selection is still in the
+     * refreshed pool — otherwise MMKV points at a new node while the core keeps the old config until
+     * manual reconnect (looks like «connection died after a few minutes»).
      */
-    suspend fun refreshServersAndSelectBest(context: Context) = withContext(Dispatchers.IO) {
-        ensurePublicPoolSubscription(context)
-        val merged = StringBuilder()
-        for (raw in AppConfig.BABUK_SUBSCRIPTION_URLS) {
-            val url = HttpUtil.toIdnUrl(raw.trim())
-            val body = HttpUtil.getUrlContent(url, 30000) ?: continue
-            val lines = body.count { it == '\n' } + 1
-            Log.i(TAG, "Pool URL fetched: $lines lines, ${body.length} bytes -> $url")
-            merged.appendLine(body)
-        }
-        val text = merged.toString().trim()
-        if (text.isEmpty()) {
-            Log.w(TAG, "No subscription content fetched")
-            BabukDebugLog.log(context, TAG, "refresh: no subscription content")
-            return@withContext
-        }
-        val (count, _) = AngConfigManager.importBatchConfig(text, AppConfig.BABUK_SUBSCRIPTION_ID, append = false)
-        Log.i(TAG, "Imported $count endpoints from public pool")
-        BabukDebugLog.log(context, TAG, "refresh: imported $count endpoints")
-        if (count > 0) {
-            BabukServerSelector.pickBestServer(AppConfig.BABUK_SUBSCRIPTION_ID)
+    suspend fun refreshServersAndSelectBest(context: Context) = refreshMutex.withLock {
+        withContext(Dispatchers.IO) {
+            ensurePublicPoolSubscription(context)
+            val merged = StringBuilder()
+            for (raw in AppConfig.BABUK_SUBSCRIPTION_URLS) {
+                val url = HttpUtil.toIdnUrl(raw.trim())
+                val body = HttpUtil.getUrlContent(url, 30000) ?: continue
+                val lines = body.count { it == '\n' } + 1
+                Log.i(TAG, "Pool URL fetched: $lines lines, ${body.length} bytes -> $url")
+                merged.appendLine(body)
+            }
+            val text = merged.toString().trim()
+            if (text.isEmpty()) {
+                Log.w(TAG, "No subscription content fetched")
+                BabukDebugLog.log(context, TAG, "refresh: no subscription content")
+                return@withContext
+            }
+            val (count, _) = AngConfigManager.importBatchConfig(text, AppConfig.BABUK_SUBSCRIPTION_ID, append = false)
+            Log.i(TAG, "Imported $count endpoints from public pool")
+            BabukDebugLog.log(context, TAG, "refresh: imported $count endpoints")
+            if (count <= 0) return@withContext
+
+            val subId = AppConfig.BABUK_SUBSCRIPTION_ID
+            val selected = MmkvManager.getSelectServer()
+            val guids = MmkvManager.decodeServerList(subId)
+            val needPick = selected.isNullOrBlank() || selected !in guids
+            if (needPick) {
+                BabukServerSelector.pickBestServer(subId)
+                BabukDebugLog.log(context, TAG, "refresh: pickBestServer (no valid selection)")
+            } else {
+                BabukDebugLog.log(context, TAG, "refresh: keep selection guid=$selected (${guids.size} in pool)")
+            }
         }
     }
 
