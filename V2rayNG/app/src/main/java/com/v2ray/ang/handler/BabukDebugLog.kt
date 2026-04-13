@@ -10,7 +10,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** File log in cache for sharing; same as 1.0.3-babuk builds. */
+/** File log in cache for sharing (VolKVN). */
 object BabukDebugLog {
 
     private const val TAG = "BabukDebugLog"
@@ -47,7 +47,7 @@ object BabukDebugLog {
         if (sessionHeaderWritten) return
         sessionHeaderWritten = true
         val header = buildString {
-            append("--- babuKVN debug session ---\n")
+            append("--- VolKVN debug session ---\n")
             append("versionName=${BuildConfig.VERSION_NAME} versionCode=${BuildConfig.VERSION_CODE} buildType=${BuildConfig.BUILD_TYPE}\n")
             append("applicationId=${BuildConfig.APPLICATION_ID} pid=${android.os.Process.myPid()}\n")
             append("--- end header ---\n")

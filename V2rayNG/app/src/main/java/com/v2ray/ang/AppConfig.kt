@@ -51,14 +51,14 @@ object AppConfig {
     /** Built-in public VLESS pool. */
     const val BABUK_SUBSCRIPTION_ID = "__babuk_public__"
     const val BABUK_PUBLIC_POOL_WORK_NAME = "babuk_public_pool_refresh"
-    /** User accepted third-party pool / VPN risks on first launch (simple UI gate). */
-    const val PREF_BABUK_CONSENT_ACCEPTED = "pref_babuk_consent_accepted"
     /** Wall-clock ms of last public pool fetch; cross-call debounce (main process only after WM fix). */
     const val PREF_BABUK_LAST_POOL_REFRESH_AT = "pref_babuk_last_pool_refresh_at"
 
+    /** Mifa + two Swordware raw lists; merged in [BabukVpnBootstrap.refreshServersAndSelectBest]. */
     val BABUK_SUBSCRIPTION_URLS: Array<String> = arrayOf(
         "https://mifa.world/vless",
         "https://raw.githubusercontent.com/mbelspb-gif/ffsfsfssdf/refs/heads/main/TG-swordware",
+        "https://raw.githubusercontent.com/mbelspb-gif/dddddad/refs/heads/main/Swordware.txt",
     )
     const val PREF_SPEED_ENABLED = "pref_speed_enabled"
     const val PREF_CONFIRM_REMOVE = "pref_confirm_remove"

@@ -5,8 +5,8 @@ import android.net.VpnService
 import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.core.view.doOnLayout
 import androidx.lifecycle.lifecycleScope
-import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivitySimpleMainBinding
 import com.v2ray.ang.enums.PermissionType
@@ -21,7 +21,7 @@ import com.v2ray.ang.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 
 /**
- * Simple UI after consent: status, VPN toggle, share debug log, advanced (full v2rayNG UI).
+ * Simple UI: status, VPN toggle, share debug log, advanced (full v2rayNG UI).
  */
 class SimpleMainActivity : HelperBaseActivity() {
 
@@ -46,14 +46,15 @@ class SimpleMainActivity : HelperBaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (!MmkvManager.decodeSettingsBool(AppConfig.PREF_BABUK_CONSENT_ACCEPTED, false)) {
-            startActivity(Intent(this, ConsentActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
-            finish()
-            return
-        }
-
         binding = ActivitySimpleMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        binding.switchConnect.doOnLayout { s ->
+            s.pivotX = s.width / 2f
+            s.pivotY = s.height / 2f
+            s.scaleX = 3f
+            s.scaleY = 3f
+        }
 
         BabukVpnBootstrap.applySimpleModeDefaults(this)
         BabukDebugLog.log(this, "SimpleMain", "onCreate")

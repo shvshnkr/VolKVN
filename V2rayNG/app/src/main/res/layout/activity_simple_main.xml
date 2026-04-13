@@ -15,7 +15,7 @@
         android:paddingTop="8dp"
         android:text="@string/babuk_simple_title"
         android:textAppearance="?attr/textAppearanceTitleLarge"
-        tools:text="babuKVN" />
+        tools:text="ВолшебныйКВН" />
 
     <Space
         android:layout_width="match_parent"
@@ -37,14 +37,24 @@
         android:layout_width="match_parent"
         android:layout_height="24dp" />
 
-    <com.google.android.material.materialswitch.MaterialSwitch
-        android:id="@+id/switch_connect"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:minWidth="200dp"
-        android:text="@string/babuk_simple_switch_label"
-        android:textSize="16sp"
-        tools:checked="false" />
+    <!-- 3× scale applied in code (pivot center); extra space so scaled switch is not clipped -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="220dp"
+        android:clipChildren="false"
+        android:clipToPadding="false">
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switch_connect"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:minWidth="200dp"
+            android:minHeight="48dp"
+            android:text="@string/babuk_simple_switch_label"
+            android:textSize="16sp"
+            tools:checked="false" />
+    </FrameLayout>
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btn_share_log"

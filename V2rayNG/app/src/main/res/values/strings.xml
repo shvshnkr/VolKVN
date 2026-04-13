@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">babuKVN</string>
+    <string name="app_name" translatable="false">VolKVN</string>
     <string name="app_widget_name">Switch</string>
     <string name="app_tile_name">Switch</string>
     <string name="app_tile_first_use">First use of this feature, please use the app to add server</string>
@@ -438,23 +438,19 @@
         <item>WebDAV</item>
     </string-array>
 
-    <string name="babuk_simple_title">babuKVN</string>
+    <string name="babuk_simple_title">ВолшебныйКВН</string>
     <string name="babuk_simple_switch_label">Turn on</string>
-    <string name="babuk_simple_footer">Free babuKVN for Telegram, WhatsApp, and YouTube</string>
+    <string name="babuk_simple_footer">VolKVN for Telegram, WhatsApp, and YouTube</string>
     <string name="babuk_share_debug_log">Share debug log</string>
     <string name="babuk_share_debug_failed">Could not prepare the log file.</string>
     <string name="babuk_advanced_mode">Advanced</string>
-    <string name="babuk_consent_title">Before you continue</string>
-    <string name="babuk_consent_body">babuKVN uses third-party server lists (subscriptions). Operators of those endpoints may see connection metadata. The app is provided as-is; you are responsible for complying with local laws. Tap Accept only if you understand these risks.</string>
-    <string name="babuk_consent_accept">Accept</string>
-    <string name="babuk_consent_decline">Exit</string>
     <string name="babuk_simple_status_refreshing">Updating server list…</string>
     <string name="babuk_simple_status_no_servers">No servers loaded yet. Check network and try reopening the app.</string>
     <string name="babuk_simple_status_ready">Ready. Toggle to connect.</string>
     <string name="babuk_simple_status_on">Connected</string>
     <string name="babuk_simple_status_off">Disconnected</string>
     <string name="babuk_simple_no_profile">No server selected. Wait for the list to update.</string>
-    <string name="babuk_subscription_remarks">babuKVN public pool</string>
+    <string name="babuk_subscription_remarks">VolKVN public pool</string>
     <string name="babuk_err_no_server_selected">No profile selected. Wait until the list updates.</string>
     <string name="babuk_err_decode_config">Could not read the selected profile. Try updating the list.</string>
     <string name="babuk_err_invalid_server_address">Invalid server address in profile: %1$s</string>

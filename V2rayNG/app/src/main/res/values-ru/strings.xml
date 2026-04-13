@@ -431,23 +431,19 @@
         <item>WebDAV</item>
     </string-array>
 
-    <string name="babuk_simple_title">babuKVN</string>
+    <string name="babuk_simple_title">ВолшебныйКВН</string>
     <string name="babuk_simple_switch_label">Включить</string>
-    <string name="babuk_simple_footer">Бесплатный babuKVN для Telegram, WhatsApp и YouTube</string>
+    <string name="babuk_simple_footer">VolKVN для Telegram, WhatsApp и YouTube</string>
     <string name="babuk_share_debug_log">Отправить отладочный лог</string>
     <string name="babuk_share_debug_failed">Не удалось подготовить файл лога.</string>
     <string name="babuk_advanced_mode">Расширенный режим</string>
-    <string name="babuk_consent_title">Перед продолжением</string>
-    <string name="babuk_consent_body">babuKVN использует сторонние списки серверов (подписки). Операторы этих узлов могут видеть метаданные соединения. Приложение предоставляется «как есть»; соблюдение законов вашей страны — ваша ответственность. Нажимайте «Принимаю», только если понимаете эти риски.</string>
-    <string name="babuk_consent_accept">Принимаю</string>
-    <string name="babuk_consent_decline">Выйти</string>
     <string name="babuk_simple_status_refreshing">Обновление списка серверов…</string>
     <string name="babuk_simple_status_no_servers">Серверы не загрузились. Проверьте сеть и откройте приложение снова.</string>
     <string name="babuk_simple_status_ready">Готово. Включите переключатель.</string>
     <string name="babuk_simple_status_on">Подключено</string>
     <string name="babuk_simple_status_off">Отключено</string>
     <string name="babuk_simple_no_profile">Сервер не выбран. Дождитесь обновления списка.</string>
-    <string name="babuk_subscription_remarks">babuKVN — общий пул</string>
+    <string name="babuk_subscription_remarks">VolKVN — общий пул</string>
     <string name="babuk_err_no_server_selected">Профиль не выбран. Дождитесь обновления списка.</string>
     <string name="babuk_err_decode_config">Не удалось прочитать выбранный профиль. Попробуйте обновить список.</string>
     <string name="babuk_err_invalid_server_address">Некорректный адрес сервера в профиле: %1$s</string>
