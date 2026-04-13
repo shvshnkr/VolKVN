@@ -4,9 +4,9 @@ import com.v2ray.ang.util.Utils
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Per-session credentials for local SOCKS/HTTP inbounds on loopback.
- * Other apps on the device can reach 127.0.0.1 ports; random user/pass prevents use without our process.
- * Regenerated when VPN/proxy starts; cleared in [V2RayServiceManager.stopCoreLoop].
+ * Session credentials for local SOCKS/HTTP when bound to **TCP loopback** (hev-tun or LAN proxy sharing).
+ * Default VolKVN path uses **Unix sockets in app filesDir** instead (see [V2rayConfigManager]); then no
+ * password is needed because other UIDs cannot open that socket path.
  */
 object LocalSocksAuth {
     private val session = AtomicReference<Pair<String, String>?>(null)
