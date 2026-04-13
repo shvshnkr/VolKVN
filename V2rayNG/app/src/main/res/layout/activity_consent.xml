@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:id="@+id/tv_consent_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/babuk_consent_title"
+        android:textAppearance="?attr/textAppearanceHeadlineSmall" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="16dp"
+        android:layout_weight="1">
+
+        <TextView
+            android:id="@+id/tv_consent_body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/babuk_consent_body"
+            android:textAppearance="?attr/textAppearanceBodyMedium" />
+    </ScrollView>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_accept"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="@string/babuk_consent_accept" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_decline"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/babuk_consent_decline" />
+</LinearLayout>
