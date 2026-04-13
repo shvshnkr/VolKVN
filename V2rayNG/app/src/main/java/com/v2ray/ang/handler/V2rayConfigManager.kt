@@ -392,29 +392,22 @@ object V2rayConfigManager {
                 inbound1.sniffing?.destOverride?.add("fakedns")
             }
 
-            if (!Utils.isXray()) {
-                val inbound2 = JsonUtil.fromJson(JsonUtil.toJson(inbound1), V2rayConfig.InboundBean::class.java) ?: return false
-                inbound2.tag = EConfigType.HTTP.name.lowercase()
-                inbound2.port = SettingsManager.getHttpPort()
-                inbound2.protocol = EConfigType.HTTP.name.lowercase()
-                v2rayConfig.inbounds.add(inbound2)
-            }
+            val inbound2 = JsonUtil.fromJson(JsonUtil.toJson(inbound1), V2rayConfig.InboundBean::class.java) ?: return false
+            inbound2.tag = EConfigType.HTTP.name.lowercase()
+            inbound2.port = SettingsManager.getHttpPort()
+            inbound2.protocol = EConfigType.HTTP.name.lowercase()
+            inbound2.settings = V2rayConfig.InboundBean.InSettingsBean(
+                userLevel = AppConfig.DEFAULT_LEVEL,
+            )
+            v2rayConfig.inbounds.add(inbound2)
 
             if (inbound1.protocol.equals("socks", ignoreCase = true)) {
-                val user = LocalSocksAuth.username()
-                val pass = LocalSocksAuth.password()
-                if (user.isNotEmpty() && pass.isNotEmpty()) {
-                    inbound1.settings = inbound1.settings ?: V2rayConfig.InboundBean.InSettingsBean()
-                    inbound1.settings?.auth = "password"
-                    inbound1.settings?.accounts = listOf(
-                        V2rayConfig.InboundBean.InSettingsBean.SocksInboundAccountBean(
-                            user = user,
-                            pass = pass,
-                            level = AppConfig.DEFAULT_LEVEL,
-                        ),
-                    )
-                    inbound1.settings?.udp = true
-                }
+                inbound1.settings = V2rayConfig.InboundBean.InSettingsBean(
+                    auth = "noauth",
+                    udp = true,
+                    userLevel = AppConfig.DEFAULT_LEVEL,
+                    accounts = null,
+                )
             }
 
             if (needTun()) {

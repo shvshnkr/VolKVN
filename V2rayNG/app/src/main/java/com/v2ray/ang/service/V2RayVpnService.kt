@@ -99,7 +99,7 @@ class V2RayVpnService : VpnService(), ServiceControl {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(AppConfig.TAG, "StartCore-VPN: Service command received")
-        LocalSocksAuth.regenerate()
+        LocalSocksAuth.clear()
         setupVpnService()
         startService()
         return START_STICKY
