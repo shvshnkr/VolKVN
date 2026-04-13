@@ -47,6 +47,19 @@ object AppConfig {
     const val SUBSCRIPTION_AUTO_UPDATE_INTERVAL = "pref_auto_update_interval"
     const val SUBSCRIPTION_DEFAULT_UPDATE_INTERVAL = "1440" // Default is 24 hours
     const val SUBSCRIPTION_UPDATE_TASK_NAME = "subscription_updater"
+
+    /** Built-in public VLESS pool. */
+    const val BABUK_SUBSCRIPTION_ID = "__babuk_public__"
+    const val BABUK_PUBLIC_POOL_WORK_NAME = "babuk_public_pool_refresh"
+    /** User accepted third-party pool / VPN risks on first launch (simple UI gate). */
+    const val PREF_BABUK_CONSENT_ACCEPTED = "pref_babuk_consent_accepted"
+    /** Wall-clock ms of last public pool fetch; cross-call debounce (main process only after WM fix). */
+    const val PREF_BABUK_LAST_POOL_REFRESH_AT = "pref_babuk_last_pool_refresh_at"
+
+    val BABUK_SUBSCRIPTION_URLS: Array<String> = arrayOf(
+        "https://mifa.world/vless",
+        "https://raw.githubusercontent.com/mbelspb-gif/ffsfsfssdf/refs/heads/main/TG-swordware",
+    )
     const val PREF_SPEED_ENABLED = "pref_speed_enabled"
     const val PREF_CONFIRM_REMOVE = "pref_confirm_remove"
     const val PREF_START_SCAN_IMMEDIATE = "pref_start_scan_immediate"
@@ -58,8 +71,6 @@ object AppConfig {
     const val PREF_PROXY_SHARING = "pref_proxy_sharing_enabled"
     const val PREF_ALLOW_INSECURE = "pref_allow_insecure"
     const val PREF_SOCKS_PORT = "pref_socks_port"
-    const val PREF_SOCKS_USERNAME = "pref_socks_username"
-    const val PREF_SOCKS_PASSWORD = "pref_socks_password"
     const val PREF_REMOTE_DNS = "pref_remote_dns"
     const val PREF_DOMESTIC_DNS = "pref_domestic_dns"
     const val PREF_DNS_HOSTS = "pref_dns_hosts"

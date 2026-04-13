@@ -5,7 +5,9 @@ import androidx.multidex.MultiDexApplication
 import androidx.work.Configuration
 import androidx.work.WorkManager
 import com.tencent.mmkv.MMKV
-import com.v2ray.ang.AppConfig.ANG_PACKAGE
+import com.v2ray.ang.AppConfig
+import com.v2ray.ang.handler.BabukVpnBootstrap
+import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
 
 class AngApplication : MultiDexApplication() {
@@ -22,9 +24,9 @@ class AngApplication : MultiDexApplication() {
         application = this
     }
 
-    private val workManagerConfiguration: Configuration = Configuration.Builder()
-        .setDefaultProcessName("${ANG_PACKAGE}:bg")
-        .build()
+    // Do not force `:bg` — pool refresh + UI shared MMKV/import must not race in two processes
+    // (Mutex is per-process; RemoteWorkManager + :bg caused double import and broken selection).
+    private val workManagerConfiguration: Configuration = Configuration.Builder().build()
 
     /**
      * Initializes the application.
@@ -40,6 +42,9 @@ class AngApplication : MultiDexApplication() {
         // Ensure critical preference defaults are present in MMKV early
         SettingsManager.initApp(this)
         SettingsManager.setNightMode()
+        if (MmkvManager.decodeSettingsBool(AppConfig.PREF_BABUK_CONSENT_ACCEPTED, false)) {
+            BabukVpnBootstrap.schedulePublicPoolWorker()
+        }
 
         es.dmoral.toasty.Toasty.Config.getInstance()
             .setGravity(android.view.Gravity.BOTTOM, 0, 300)

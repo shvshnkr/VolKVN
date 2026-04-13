@@ -14,6 +14,7 @@ import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.dto.SubscriptionItem
 import com.v2ray.ang.util.HttpUtil
+import com.v2ray.ang.util.Utils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -27,12 +28,21 @@ object BabukVpnBootstrap {
 
     /**
      * One-shot refresh used from UI and worker.
-     * Does **not** call [BabukServerSelector.pickBestServer] if the current selection is still in the
-     * refreshed pool — otherwise MMKV points at a new node while the core keeps the old config until
-     * manual reconnect (looks like «connection died after a few minutes»).
+     * - Debounced a few seconds to avoid duplicate imports from tight UI + worker scheduling.
+     * - If VPN is **up** and the selected profile is still in the pool, do not [pickBestServer] (avoids
+     *   MMKV/core mismatch while the core keeps the old config).
+     * - If VPN is **down**, always [pickBestServer] after import so the chosen node is TCP-probed
+     *   (avoids «no connect» from keeping a dead profile that merely survived import matching).
      */
     suspend fun refreshServersAndSelectBest(context: Context) = refreshMutex.withLock {
         withContext(Dispatchers.IO) {
+            val nowWall = System.currentTimeMillis()
+            val lastWall = MmkvManager.decodeSettingsLong(AppConfig.PREF_BABUK_LAST_POOL_REFRESH_AT, 0L)
+            if (lastWall > 0L && nowWall - lastWall < 4000L) {
+                BabukDebugLog.log(context, TAG, "refresh: skip debounce ${nowWall - lastWall}ms")
+                return@withContext
+            }
+
             ensurePublicPoolSubscription(context)
             val merged = StringBuilder()
             for (raw in AppConfig.BABUK_SUBSCRIPTION_URLS) {
@@ -53,13 +63,20 @@ object BabukVpnBootstrap {
             BabukDebugLog.log(context, TAG, "refresh: imported $count endpoints")
             if (count <= 0) return@withContext
 
+            MmkvManager.encodeSettings(AppConfig.PREF_BABUK_LAST_POOL_REFRESH_AT, System.currentTimeMillis())
+
             val subId = AppConfig.BABUK_SUBSCRIPTION_ID
             val selected = MmkvManager.getSelectServer()
             val guids = MmkvManager.decodeServerList(subId)
-            val needPick = selected.isNullOrBlank() || selected !in guids
+            val vpnUp = Utils.isVpnTransportActive(context.applicationContext)
+            val needPick = selected.isNullOrBlank() || selected !in guids || !vpnUp
             if (needPick) {
                 BabukServerSelector.pickBestServer(subId)
-                BabukDebugLog.log(context, TAG, "refresh: pickBestServer (no valid selection)")
+                BabukDebugLog.log(
+                    context,
+                    TAG,
+                    "refresh: pickBestServer (vpnUp=$vpnUp needPick reasons: blank=${selected.isNullOrBlank()} missing=${selected != null && selected !in guids})",
+                )
             } else {
                 BabukDebugLog.log(context, TAG, "refresh: keep selection guid=$selected (${guids.size} in pool)")
             }
