@@ -218,10 +218,6 @@
 
     <string name="title_pref_socks_port">Порт локального прокси</string>
     <string name="summary_pref_socks_port">Порт локального прокси</string>
-    <string name="title_pref_socks_username">Имя пользователя локального прокси (опционально)</string>
-    <string name="summary_pref_socks_username">Имя пользователя</string>
-    <string name="title_pref_socks_password">Пароль локального прокси (опционально)</string>
-    <string name="summary_pref_socks_password">Пароль</string>
 
     <string name="title_pref_local_dns_port">Порт локальной DNS</string>
     <string name="summary_pref_local_dns_port">Порт локальной DNS</string>
@@ -434,5 +430,23 @@
         <item>Локально</item>
         <item>WebDAV</item>
     </string-array>
+
+    <string name="babuk_simple_title">ВолшебныйКВН</string>
+    <string name="babuk_simple_switch_label">Включить</string>
+    <string name="babuk_simple_footer">VolKVN для Telegram, WhatsApp и YouTube</string>
+    <string name="babuk_share_debug_log">Отправить отладочный лог</string>
+    <string name="babuk_share_debug_failed">Не удалось подготовить файл лога.</string>
+    <string name="babuk_advanced_mode">Расширенный режим</string>
+    <string name="babuk_simple_status_refreshing">Обновление списка серверов…</string>
+    <string name="babuk_simple_status_no_servers">Серверы не загрузились. Проверьте сеть и откройте приложение снова.</string>
+    <string name="babuk_simple_status_ready">Готово. Включите переключатель.</string>
+    <string name="babuk_simple_status_on">Подключено</string>
+    <string name="babuk_simple_status_off">Отключено</string>
+    <string name="babuk_simple_no_profile">Сервер не выбран. Дождитесь обновления списка.</string>
+    <string name="babuk_subscription_remarks">VolKVN — общий пул</string>
+    <string name="babuk_err_no_server_selected">Профиль не выбран. Дождитесь обновления списка.</string>
+    <string name="babuk_err_decode_config">Не удалось прочитать выбранный профиль. Попробуйте обновить список.</string>
+    <string name="babuk_err_invalid_server_address">Некорректный адрес сервера в профиле: %1$s</string>
+    <string name="babuk_err_start_foreground">Не удалось запустить службу: %1$s. Разрешите уведомления, если система запросит.</string>
 
 </resources>
