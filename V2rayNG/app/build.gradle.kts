@@ -12,8 +12,8 @@ android {
         applicationId = "com.babukvn.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 732
-        versionName = "1.0.4.3-babuk"
+        versionCode = 733
+        versionName = "1.0.4.4-babuk"
         multiDexEnabled = true
 
         val abiFilterList = (properties["ABI_FILTERS"] as? String)?.split(';')

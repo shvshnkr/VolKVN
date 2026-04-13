@@ -35,13 +35,11 @@ object V2rayConfigManager {
     private var initConfigCacheWithTun: String? = null
 
     /**
-     * Bind SOCKS/HTTP to Unix sockets under [Context.getFilesDir] (0700): other apps cannot open them
-     * (same approach as libbox/sing-box-style stacks). Disabled for LAN sharing or hev-tun (TCP to loopback only).
+     * Unix sockets in app-private dir would isolate local inbounds from other UIDs (sing-box-style),
+     * but the bundled Xray on Android in this build did not forward TUN traffic correctly with UDS inbounds
+     * (VPN up, no payload). Keep TCP loopback + [LocalSocksAuth] until a core/config combo is verified.
      */
-    fun useUnixSocketForAppPrivateLocalInbounds(): Boolean {
-        return MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING) != true &&
-            !SettingsManager.isUsingHevTun()
-    }
+    fun useUnixSocketForAppPrivateLocalInbounds(): Boolean = false
 
     //region get config function
 
