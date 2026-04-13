@@ -54,7 +54,12 @@ object AppConfig {
     /** Wall-clock ms of last public pool fetch; cross-call debounce (main process only after WM fix). */
     const val PREF_BABUK_LAST_POOL_REFRESH_AT = "pref_babuk_last_pool_refresh_at"
 
-    /** Mifa + two Swordware raw lists; merged in [BabukVpnBootstrap.refreshServersAndSelectBest]. */
+    /**
+     * Public pool sources, fetched in order; bodies concatenated then dedup-imported in
+     * [BabukVpnBootstrap.refreshServersAndSelectBest].
+     * - [https://mifa.world/vless] — primary site list (“mifa”).
+     * - GitHub raw URLs whose path contains **swordware** (mirrors of the Swordware feed).
+     */
     val BABUK_SUBSCRIPTION_URLS: Array<String> = arrayOf(
         "https://mifa.world/vless",
         "https://raw.githubusercontent.com/mbelspb-gif/ffsfsfssdf/refs/heads/main/TG-swordware",

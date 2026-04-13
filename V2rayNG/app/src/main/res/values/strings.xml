@@ -444,6 +444,7 @@
     <string name="babuk_share_debug_log">Share debug log</string>
     <string name="babuk_share_debug_failed">Could not prepare the log file.</string>
     <string name="babuk_advanced_mode">Advanced</string>
+    <string name="babuk_back_to_simple">Back to simple screen</string>
     <string name="babuk_simple_status_refreshing">Updating server list…</string>
     <string name="babuk_simple_status_no_servers">No servers loaded yet. Check network and try reopening the app.</string>
     <string name="babuk_simple_status_ready">Ready. Toggle to connect.</string>

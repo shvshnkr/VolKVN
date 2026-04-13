@@ -35,11 +35,102 @@ object V2rayConfigManager {
     private var initConfigCacheWithTun: String? = null
 
     /**
-     * Unix sockets in app-private dir would isolate local inbounds from other UIDs (sing-box-style),
-     * but the bundled Xray on Android in this build did not forward TUN traffic correctly with UDS inbounds
-     * (VPN up, no payload). Keep TCP loopback + [LocalSocksAuth] until a core/config combo is verified.
+     * Unix sockets in app-private [Context.getFilesDir] isolate local SOCKS/HTTP from other UIDs.
+     *
+     * Disabled when:
+     * - LAN proxy sharing (must listen on TCP),
+     * - hev-tun ([TProxyService] YAML dials loopback TCP + [LocalSocksAuth]),
+     * - **any VpnService mode**: with Xray built-in TUN on Android, SOCKS/HTTP bound only to UDS
+     *   yields a connected VPN but **no user traffic** (observed with current libv2ray/Xray stack; TUN uses
+     *   the dispatcher directly, yet the bad interaction appears limited to this configuration).
+     *
+     * UDS remains for **proxy-only** (no VPN), where there is no TUN inbound.
      */
-    fun useUnixSocketForAppPrivateLocalInbounds(): Boolean = false
+    fun useUnixSocketForAppPrivateLocalInbounds(): Boolean {
+        if (MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING) == true) return false
+        if (SettingsManager.isUsingHevTun()) return false
+        if (SettingsManager.isVpnMode()) return false
+        return true
+    }
+
+    /** Post-process JSON for core: strip `port` on Unix `listen` (Gson emitted `port:0` breaks some Xray builds). */
+    fun finalizeV2rayConfigJson(context: Context, json: String): String {
+        val stripped = stripPortForUnixSocketInbounds(json)
+        logV2rayInboundSummary(context, stripped)
+        return stripped
+    }
+
+    private fun finalizeConfigContent(context: Context, result: ConfigResult): ConfigResult {
+        if (result.status && result.content.isNotEmpty()) {
+            result.content = finalizeV2rayConfigJson(context, result.content)
+        }
+        return result
+    }
+
+    private fun isUnixSocketListen(listen: String): Boolean {
+        if (listen.isEmpty()) return false
+        val t = listen.trim()
+        if (t == AppConfig.LOOPBACK || t == "0.0.0.0" || t == "::" || t == "[::]" || t == "[::1]" || t == "::1") {
+            return false
+        }
+        if (t.startsWith("@")) return true
+        if (t.startsWith("/")) return true
+        if (t.contains("\\")) return true
+        if (t.contains("/") && !t.contains("://")) return true
+        return false
+    }
+
+    private fun stripPortForUnixSocketInbounds(content: String): String {
+        return try {
+            val obj = JsonUtil.parseString(content) ?: return content
+            if (!obj.has("inbounds") || !obj["inbounds"].isJsonArray) return content
+            val arr = obj["inbounds"].asJsonArray
+            var changed = false
+            for (el in arr) {
+                if (!el.isJsonObject) continue
+                val inbound = el.asJsonObject
+                if (!inbound.has("listen")) continue
+                val listenEl = inbound["listen"]
+                if (!listenEl.isJsonPrimitive || !listenEl.asJsonPrimitive.isString) continue
+                if (!isUnixSocketListen(listenEl.asString)) continue
+                if (inbound.has("port")) {
+                    inbound.remove("port")
+                    changed = true
+                }
+            }
+            if (changed) JsonUtil.toJsonPretty(obj).orEmpty().ifEmpty { content } else content
+        } catch (e: Exception) {
+            Log.w(AppConfig.TAG, "stripPortForUnixSocketInbounds failed", e)
+            content
+        }
+    }
+
+    private fun logV2rayInboundSummary(context: Context, json: String) {
+        try {
+            val obj = JsonUtil.parseString(json) ?: return
+            if (!obj.has("inbounds") || !obj["inbounds"].isJsonArray) return
+            val inbounds = obj["inbounds"].asJsonArray
+            val sb = StringBuilder()
+            val max = minOf(inbounds.size(), 8)
+            for (i in 0 until max) {
+                val el = inbounds[i]
+                if (!el.isJsonObject) continue
+                val o = el.asJsonObject
+                val tag = o.get("tag")?.takeIf { it.isJsonPrimitive }?.asString ?: "?"
+                val listen = o.get("listen")?.takeIf { it.isJsonPrimitive }?.asString ?: "?"
+                val port = o.get("port")?.toString() ?: "-"
+                val proto = o.get("protocol")?.takeIf { it.isJsonPrimitive }?.asString ?: "?"
+                sb.append("[$tag $proto listen=$listen port=$port] ")
+            }
+            val suffix = if (inbounds.size() > max) " …(+${inbounds.size() - max})" else ""
+            val msg =
+                "inbounds(${inbounds.size()}): ${sb.toString().trim()}$suffix udsMode=${useUnixSocketForAppPrivateLocalInbounds()}"
+            Log.i(AppConfig.TAG, "V2rayCfg $msg")
+            BabukDebugLog.log(context.applicationContext, "V2rayCfg", msg)
+        } catch (e: Exception) {
+            Log.w(AppConfig.TAG, "logV2rayInboundSummary failed", e)
+        }
+    }
 
     //region get config function
 
@@ -53,13 +144,16 @@ object V2rayConfigManager {
     fun getV2rayConfig(context: Context, guid: String): ConfigResult {
         try {
             val config = MmkvManager.decodeServerConfig(guid) ?: return ConfigResult(false)
-            return if (config.configType == EConfigType.CUSTOM) {
-                getV2rayCustomConfig(context, guid, config)
-            } else if (config.configType == EConfigType.POLICYGROUP) {
-                getV2rayGroupConfig(context, guid, config)
-            } else {
-                getV2rayNormalConfig(context, guid, config)
-            }
+            return finalizeConfigContent(
+                context,
+                if (config.configType == EConfigType.CUSTOM) {
+                    getV2rayCustomConfig(context, guid, config)
+                } else if (config.configType == EConfigType.POLICYGROUP) {
+                    getV2rayGroupConfig(context, guid, config)
+                } else {
+                    getV2rayNormalConfig(context, guid, config)
+                },
+            )
         } catch (e: Exception) {
             Log.e(AppConfig.TAG, "Failed to get V2ray config", e)
             return ConfigResult(false)
@@ -76,14 +170,17 @@ object V2rayConfigManager {
     fun getV2rayConfig4Speedtest(context: Context, guid: String): ConfigResult {
         try {
             val config = MmkvManager.decodeServerConfig(guid) ?: return ConfigResult(false)
-            return if (config.configType == EConfigType.CUSTOM) {
-                getV2rayCustomConfig(context, guid, config)
-            } else if (config.configType == EConfigType.POLICYGROUP) {
-                // The number of policy groups will not be very large, so no special handling is needed.
-                getV2rayGroupConfig(context, guid, config)
-            } else {
-                getV2rayNormalConfig4Speedtest(context, guid, config)
-            }
+            return finalizeConfigContent(
+                context,
+                if (config.configType == EConfigType.CUSTOM) {
+                    getV2rayCustomConfig(context, guid, config)
+                } else if (config.configType == EConfigType.POLICYGROUP) {
+                    // The number of policy groups will not be very large, so no special handling is needed.
+                    getV2rayGroupConfig(context, guid, config)
+                } else {
+                    getV2rayNormalConfig4Speedtest(context, guid, config)
+                },
+            )
         } catch (e: Exception) {
             Log.e(AppConfig.TAG, "Failed to get V2ray config for speedtest", e)
             return ConfigResult(false)
@@ -405,6 +502,17 @@ object V2rayConfigManager {
             inbound2.tag = EConfigType.HTTP.name.lowercase()
             inbound2.protocol = EConfigType.HTTP.name.lowercase()
 
+            if (!useUds &&
+                SettingsManager.isVpnMode() &&
+                !SettingsManager.isUsingHevTun() &&
+                MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING) != true
+            ) {
+                val note =
+                    "local SOCKS/HTTP: TCP loopback (VPN + built-in TUN incompatible with UDS on this core)"
+                Log.i(AppConfig.TAG, "V2rayCfg $note")
+                BabukDebugLog.log(appCtx, "V2rayCfg", note)
+            }
+
             if (useUds) {
                 socksSock.delete()
                 httpSock.delete()
@@ -412,6 +520,10 @@ object V2rayConfigManager {
                 inbound1.port = 0
                 inbound2.listen = httpSock.absolutePath
                 inbound2.port = 0
+                val udsMsg =
+                    "uds prep socks=${socksSock.absolutePath} http=${httpSock.absolutePath} (stale deleted)"
+                Log.i(AppConfig.TAG, "V2rayCfg $udsMsg")
+                BabukDebugLog.log(appCtx, "V2rayCfg", udsMsg)
                 inbound2.settings = V2rayConfig.InboundBean.InSettingsBean(
                     userLevel = AppConfig.DEFAULT_LEVEL,
                 )
