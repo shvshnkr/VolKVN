@@ -1,8 +1,8 @@
-# babuKVN
+# VolKVN
 
 Android client based on [v2rayNG](https://github.com/2dust/v2rayNG) (GPLv3) with a **simple mode** for relatives: one switch, public VLESS subscription pools, automatic server pick, and per-app split tunneling toward Telegram, WhatsApp, and YouTube (plus Revanced YouTube when installed).
 
-Application id: `com.babukvn.app` (debug/release). Uninstall any older build signed with a different id (e.g. previous `com.babukvn.vpn`) before installing.
+Application id: `com.volkvn.app` (debug/release). Uninstall any older build signed with a different id before installing.
 
 ## Compared to upstream v2rayNG
 
@@ -30,20 +30,20 @@ USB debugging on, device connected. Examples:
 **Linux / macOS (bash):**
 
 ```bash
-adb logcat --pid=$(adb shell pidof -s com.babukvn.app)
+adb logcat --pid=$(adb shell pidof -s com.volkvn.app)
 ```
 
 **Windows (cmd):**
 
 ```bat
-adb shell pidof com.babukvn.app
+adb shell pidof com.volkvn.app
 adb logcat --pid=PASTE_PID_HERE
 ```
 
 Or capture a wide filter:
 
 ```bat
-adb logcat | findstr /i "babukvn com.babukvn.app GoLog"
+adb logcat | findstr /i "volkvn com.volkvn.app GoLog"
 ```
 
 Copy lines from pressing Connect until the error appears.

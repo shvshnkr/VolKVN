@@ -37,7 +37,7 @@ object SettingsManager {
 
     fun initApp(context: Context) {
         ensureDefaultSettings()
-        migrateBabukDisableHevTunnel()
+        migrateVolkvnDisableHevTunnel()
         //ensureDefaultSubscription()
         initRoutingRulesets(context)
         migrateServerListToSubscriptions()
@@ -462,14 +462,17 @@ object SettingsManager {
         }
     }
 
-    /** babuKVN: APK does not bundle libhev-socks5-tunnel.so; turn off hev tun once for older prefs / upstream default. */
-    private fun migrateBabukDisableHevTunnel() {
-        val migrationKey = "babuk_hev_tunnel_off_migrated_v1"
-        if (MmkvManager.decodeSettingsBool(migrationKey, false)) {
+    /** VolKVN: APK does not bundle libhev-socks5-tunnel.so; turn off hev tun once for older prefs / upstream default. */
+    private fun migrateVolkvnDisableHevTunnel() {
+        val keyNew = "volkvn_hev_tunnel_off_migrated_v1"
+        // Stored by older builds; value must match on-disk MMKV.
+        val keyLegacy = "babuk_hev_tunnel_off_migrated_v1"
+        if (MmkvManager.decodeSettingsBool(keyNew, false) || MmkvManager.decodeSettingsBool(keyLegacy, false)) {
+            MmkvManager.encodeSettings(keyNew, true)
             return
         }
         MmkvManager.encodeSettings(AppConfig.PREF_USE_HEV_TUNNEL, false)
-        MmkvManager.encodeSettings(migrationKey, true)
+        MmkvManager.encodeSettings(keyNew, true)
     }
 
     private fun migrateHysteria2PinSHA256() {

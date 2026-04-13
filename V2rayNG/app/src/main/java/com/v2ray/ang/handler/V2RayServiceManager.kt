@@ -59,7 +59,7 @@ object V2RayServiceManager {
      */
     fun startVService(context: Context, guid: String? = null) {
         Log.i(AppConfig.TAG, "StartCore-Manager: startVService from ${context::class.java.simpleName}")
-        BabukDebugLog.log(
+        VolkvnDebugLog.log(
             context,
             AppConfig.TAG,
             "startVService vpnMode=${SettingsManager.isVpnMode()} ${Utils.vpnUiDiagnostics(context)}",
@@ -77,7 +77,7 @@ object V2RayServiceManager {
      * @param context The context from which the service is stopped.
      */
     fun stopVService(context: Context) {
-        BabukDebugLog.log(context, AppConfig.TAG, "stopVService ${Utils.vpnUiDiagnostics(context)}")
+        VolkvnDebugLog.log(context, AppConfig.TAG, "stopVService ${Utils.vpnUiDiagnostics(context)}")
         MessageUtil.sendMsg2Service(context, AppConfig.MSG_STATE_STOP, "")
     }
 
@@ -107,14 +107,14 @@ object V2RayServiceManager {
         val guid = MmkvManager.getSelectServer()
         if (guid == null) {
             Log.e(AppConfig.TAG, "StartCore-Manager: No server selected")
-            context.toast(R.string.babuk_err_no_server_selected)
+            context.toast(R.string.volkvn_err_no_server_selected)
             return
         }
 
         val config = MmkvManager.decodeServerConfig(guid)
         if (config == null) {
             Log.e(AppConfig.TAG, "StartCore-Manager: Failed to decode server config")
-            context.toast(R.string.babuk_err_decode_config)
+            context.toast(R.string.volkvn_err_decode_config)
             return
         }
 
@@ -124,7 +124,7 @@ object V2RayServiceManager {
             && !Utils.isPureIpAddress(config.server.orEmpty())
         ) {
             Log.e(AppConfig.TAG, "StartCore-Manager: Invalid server configuration")
-            context.toast(context.getString(R.string.babuk_err_invalid_server_address, config.server.orEmpty()))
+            context.toast(context.getString(R.string.volkvn_err_invalid_server_address, config.server.orEmpty()))
             return
         }
 //        val result = V2rayConfigUtil.getV2rayConfig(context, guid)
@@ -149,7 +149,7 @@ object V2RayServiceManager {
             ContextCompat.startForegroundService(context, intent)
         } catch (e: Exception) {
             Log.e(AppConfig.TAG, "StartCore-Manager: Failed to start service", e)
-            context.toast(context.getString(R.string.babuk_err_start_foreground, e.message ?: e.javaClass.simpleName))
+            context.toast(context.getString(R.string.volkvn_err_start_foreground, e.message ?: e.javaClass.simpleName))
         }
     }
 

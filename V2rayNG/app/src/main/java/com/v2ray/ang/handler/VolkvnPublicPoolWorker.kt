@@ -9,17 +9,17 @@ import com.v2ray.ang.AppConfig
 /**
  * Hourly (minimum 60m periodic interval on WorkManager) refresh of bundled public subscription URLs.
  */
-class BabukPublicPoolWorker(
+class VolkvnPublicPoolWorker(
     context: Context,
     params: WorkerParameters
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
         return try {
-            BabukVpnBootstrap.refreshServersAndSelectBest(applicationContext)
+            VolkvnVpnBootstrap.refreshServersAndSelectBest(applicationContext)
             Result.success()
         } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "BabukPublicPoolWorker failed", e)
+            Log.e(AppConfig.TAG, "VolkvnPublicPoolWorker failed", e)
             Result.retry()
         }
     }

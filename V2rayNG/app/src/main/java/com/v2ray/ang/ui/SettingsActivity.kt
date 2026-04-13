@@ -115,8 +115,8 @@ class SettingsActivity : BaseActivity() {
                 true
             }
 
-            findPreference<Preference>("pref_babuk_open_pool_sources")?.setOnPreferenceClickListener {
-                startActivity(Intent(requireContext(), BabukPoolSourcesActivity::class.java))
+            findPreference<Preference>("pref_volkvn_open_pool_sources")?.setOnPreferenceClickListener {
+                startActivity(Intent(requireContext(), VolkvnPoolSourcesActivity::class.java))
                 true
             }
         }

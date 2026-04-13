@@ -9,11 +9,11 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.babukvn.app"
+        applicationId = "com.volkvn.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 738
-        versionName = "1.0.4.9-babuk"
+        versionCode = 739
+        versionName = "1.0.5.0-volkvn"
         multiDexEnabled = true
 
         val abiFilterList = (properties["ABI_FILTERS"] as? String)?.split(';')

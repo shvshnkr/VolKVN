@@ -24,7 +24,7 @@ import com.v2ray.ang.extension.serializable
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.AngConfigManager
-import com.v2ray.ang.handler.BabukDebugLog
+import com.v2ray.ang.handler.VolkvnDebugLog
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SpeedtestManager
@@ -75,7 +75,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             SettingsManager.isVpnMode() &&
                 Utils.isVpnTransportActive(app) &&
                 trustDaemonProcessForOptimisticUi
-        BabukDebugLog.log(
+        VolkvnDebugLog.log(
             app,
             "MainVM",
             "queryServiceRunningState vpnMode=${SettingsManager.isVpnMode()} trustDaemon=$trustDaemonProcessForOptimisticUi vpnUp=$vpnUp runningLive=${isRunning.value} ${Utils.vpnUiDiagnostics(app)}",
@@ -473,7 +473,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 AppConfig.MSG_STATE_RUNNING -> {
                     trustDaemonProcessForOptimisticUi = true
                     isRunning.value = true
-                    BabukDebugLog.log(getApplication(), "MainVM", "broadcast RUNNING")
+                    VolkvnDebugLog.log(getApplication(), "MainVM", "broadcast RUNNING")
                 }
 
                 AppConfig.MSG_STATE_NOT_RUNNING -> {
@@ -483,27 +483,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             Utils.isVpnTransportActive(app) &&
                             trustDaemonProcessForOptimisticUi
                     isRunning.value = live
-                    BabukDebugLog.log(app, "MainVM", "broadcast NOT_RUNNING live=$live ${Utils.vpnUiDiagnostics(app)}")
+                    VolkvnDebugLog.log(app, "MainVM", "broadcast NOT_RUNNING live=$live ${Utils.vpnUiDiagnostics(app)}")
                 }
 
                 AppConfig.MSG_STATE_START_SUCCESS -> {
                     trustDaemonProcessForOptimisticUi = true
                     getApplication<AngApplication>().toastSuccess(R.string.toast_services_success)
                     isRunning.value = true
-                    BabukDebugLog.log(getApplication(), "MainVM", "broadcast START_SUCCESS")
+                    VolkvnDebugLog.log(getApplication(), "MainVM", "broadcast START_SUCCESS")
                 }
 
                 AppConfig.MSG_STATE_START_FAILURE -> {
                     trustDaemonProcessForOptimisticUi = false
                     getApplication<AngApplication>().toastError(R.string.toast_services_failure)
                     isRunning.value = false
-                    BabukDebugLog.log(getApplication(), "MainVM", "broadcast START_FAILURE")
+                    VolkvnDebugLog.log(getApplication(), "MainVM", "broadcast START_FAILURE")
                 }
 
                 AppConfig.MSG_STATE_STOP_SUCCESS -> {
                     trustDaemonProcessForOptimisticUi = false
                     isRunning.value = false
-                    BabukDebugLog.log(getApplication(), "MainVM", "broadcast STOP_SUCCESS")
+                    VolkvnDebugLog.log(getApplication(), "MainVM", "broadcast STOP_SUCCESS")
                 }
 
                 AppConfig.MSG_MEASURE_DELAY_SUCCESS -> {

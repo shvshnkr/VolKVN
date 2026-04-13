@@ -20,7 +20,7 @@
             android:layout_marginHorizontal="8dp"
             android:layout_marginTop="4dp"
             android:minHeight="56dp"
-            android:text="@string/babuk_back_to_simple"
+            android:text="@string/volkvn_back_to_simple"
             android:visibility="gone"
             app:icon="@drawable/ic_simple_home_24dp"
             app:iconGravity="textStart" />

@@ -10,8 +10,8 @@ import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivitySimpleMainBinding
 import com.v2ray.ang.enums.PermissionType
 import com.v2ray.ang.extension.toast
-import com.v2ray.ang.handler.BabukDebugLog
-import com.v2ray.ang.handler.BabukVpnBootstrap
+import com.v2ray.ang.handler.VolkvnDebugLog
+import com.v2ray.ang.handler.VolkvnVpnBootstrap
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.V2RayServiceManager
@@ -48,15 +48,15 @@ class SimpleMainActivity : HelperBaseActivity() {
         binding = ActivitySimpleMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        BabukVpnBootstrap.applySimpleModeDefaults(this)
-        BabukDebugLog.log(this, "SimpleMain", "onCreate")
+        VolkvnVpnBootstrap.applySimpleModeDefaults(this)
+        VolkvnDebugLog.log(this, "SimpleMain", "onCreate")
         mainViewModel.initAssets(assets)
         mainViewModel.startListenBroadcast()
 
         mainViewModel.isRunning.observe(this) { running ->
             if (lastRunningLogged != running) {
                 lastRunningLogged = running
-                BabukDebugLog.log(this, "SimpleMain", "isRunning=$running ${Utils.vpnUiDiagnostics(this)}")
+                VolkvnDebugLog.log(this, "SimpleMain", "isRunning=$running ${Utils.vpnUiDiagnostics(this)}")
             }
             binding.switchConnect.setOnCheckedChangeListener(null)
             binding.switchConnect.isChecked = running
@@ -64,9 +64,9 @@ class SimpleMainActivity : HelperBaseActivity() {
                 onConnectSwitch(isChecked)
             }
             binding.tvStatus.text = if (running) {
-                getString(R.string.babuk_simple_status_on)
+                getString(R.string.volkvn_simple_status_on)
             } else {
-                getString(R.string.babuk_simple_status_off)
+                getString(R.string.volkvn_simple_status_off)
             }
         }
 
@@ -75,11 +75,11 @@ class SimpleMainActivity : HelperBaseActivity() {
         }
 
         binding.btnShareLog.setOnClickListener {
-            val send = BabukDebugLog.buildShareIntent(this)
+            val send = VolkvnDebugLog.buildShareIntent(this)
             if (send != null) {
-                startActivity(Intent.createChooser(send, getString(R.string.babuk_share_debug_log)))
+                startActivity(Intent.createChooser(send, getString(R.string.volkvn_share_debug_log)))
             } else {
-                toast(R.string.babuk_share_debug_failed)
+                toast(R.string.volkvn_share_debug_failed)
             }
         }
 
@@ -88,12 +88,12 @@ class SimpleMainActivity : HelperBaseActivity() {
         }
 
         lifecycleScope.launch {
-            binding.tvStatus.text = getString(R.string.babuk_simple_status_refreshing)
-            BabukVpnBootstrap.refreshServersAndSelectBest(this@SimpleMainActivity)
+            binding.tvStatus.text = getString(R.string.volkvn_simple_status_refreshing)
+            VolkvnVpnBootstrap.refreshServersAndSelectBest(this@SimpleMainActivity)
             binding.tvStatus.text = if (MmkvManager.getSelectServer().isNullOrBlank()) {
-                getString(R.string.babuk_simple_status_no_servers)
+                getString(R.string.volkvn_simple_status_no_servers)
             } else {
-                getString(R.string.babuk_simple_status_ready)
+                getString(R.string.volkvn_simple_status_ready)
             }
         }
 
@@ -115,7 +115,7 @@ class SimpleMainActivity : HelperBaseActivity() {
 
         if (MmkvManager.getSelectServer().isNullOrBlank()) {
             binding.switchConnect.isChecked = false
-            toast(R.string.babuk_simple_no_profile)
+            toast(R.string.volkvn_simple_no_profile)
             return
         }
 

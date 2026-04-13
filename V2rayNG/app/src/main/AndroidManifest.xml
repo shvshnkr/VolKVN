@@ -149,7 +149,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".ui.BabukPoolSourcesActivity"
+            android:name=".ui.VolkvnPoolSourcesActivity"
             android:exported="false" />
         <activity
             android:name=".ui.CheckUpdateActivity"
