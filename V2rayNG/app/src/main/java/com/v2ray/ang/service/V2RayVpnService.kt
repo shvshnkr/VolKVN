@@ -9,7 +9,6 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
-import android.net.ProxyInfo
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
@@ -99,7 +98,7 @@ class V2RayVpnService : VpnService(), ServiceControl {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(AppConfig.TAG, "StartCore-VPN: Service command received")
-        LocalSocksAuth.clear()
+        LocalSocksAuth.regenerate()
         setupVpnService()
         startService()
         return START_STICKY
@@ -261,8 +260,13 @@ class V2RayVpnService : VpnService(), ServiceControl {
         // Android Q (API 29) and above: Configure metering and HTTP proxy
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             builder.setMetered(false)
+            // Local HTTP inbound uses session password auth; ProxyInfo.buildDirectProxy cannot pass credentials,
+            // so publishing it would mislead apps into unauthenticated connects. Do not set system HTTP proxy.
             if (MmkvManager.decodeSettingsBool(AppConfig.PREF_APPEND_HTTP_PROXY)) {
-                builder.setHttpProxy(ProxyInfo.buildDirectProxy(LOOPBACK, SettingsManager.getHttpPort()))
+                Log.w(
+                    AppConfig.TAG,
+                    "appendHttpProxy ignored: local HTTP uses session auth (not expressible via setHttpProxy)",
+                )
             }
         }
     }

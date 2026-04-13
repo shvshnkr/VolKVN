@@ -4,8 +4,9 @@ import com.v2ray.ang.util.Utils
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Per-session credentials for the local SOCKS inbound (mitigates unauthenticated loopback SOCKS).
- * Regenerated each time the VPN/proxy service is started.
+ * Per-session credentials for local SOCKS/HTTP inbounds on loopback.
+ * Other apps on the device can reach 127.0.0.1 ports; random user/pass prevents use without our process.
+ * Regenerated when VPN/proxy starts; cleared in [V2RayServiceManager.stopCoreLoop].
  */
 object LocalSocksAuth {
     private val session = AtomicReference<Pair<String, String>?>(null)
