@@ -5,7 +5,6 @@ import android.net.VpnService
 import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.core.view.doOnLayout
 import androidx.lifecycle.lifecycleScope
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivitySimpleMainBinding
@@ -48,13 +47,6 @@ class SimpleMainActivity : HelperBaseActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivitySimpleMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
-        binding.switchConnect.doOnLayout { s ->
-            s.pivotX = s.width / 2f
-            s.pivotY = s.height / 2f
-            s.scaleX = 3f
-            s.scaleY = 3f
-        }
 
         BabukVpnBootstrap.applySimpleModeDefaults(this)
         BabukDebugLog.log(this, "SimpleMain", "onCreate")

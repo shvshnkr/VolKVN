@@ -25,7 +25,6 @@ import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.NotificationManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.V2RayServiceManager
-import com.v2ray.ang.handler.V2rayConfigManager
 import com.v2ray.ang.util.MyContextWrapper
 import com.v2ray.ang.util.Utils
 import java.lang.ref.SoftReference
@@ -99,11 +98,7 @@ class V2RayVpnService : VpnService(), ServiceControl {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(AppConfig.TAG, "StartCore-VPN: Service command received")
-        if (V2rayConfigManager.useUnixSocketForAppPrivateLocalInbounds()) {
-            LocalSocksAuth.clear()
-        } else {
-            LocalSocksAuth.regenerate()
-        }
+        LocalSocksAuth.regenerate()
         setupVpnService()
         startService()
         return START_STICKY

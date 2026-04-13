@@ -37,22 +37,24 @@
         android:layout_width="match_parent"
         android:layout_height="24dp" />
 
-    <!-- 3× scale applied in code (pivot center); extra space so scaled switch is not clipped -->
+    <!-- Large switch: do not use scaleX/Y (breaks MaterialSwitch label vs thumb layout). -->
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="220dp"
-        android:clipChildren="false"
-        android:clipToPadding="false">
+        android:layout_height="wrap_content"
+        android:minHeight="120dp"
+        android:paddingVertical="8dp">
 
         <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/switch_connect"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:minWidth="200dp"
-            android:minHeight="48dp"
+            android:minWidth="320dp"
+            android:minHeight="88dp"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="20dp"
             android:text="@string/babuk_simple_switch_label"
-            android:textSize="16sp"
+            android:textSize="22sp"
             tools:checked="false" />
     </FrameLayout>
 
