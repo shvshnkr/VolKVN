@@ -1,11 +1,17 @@
 package com.v2ray.ang.ui
 
 import android.content.Intent
+import android.net.Uri
 import android.net.VpnService
+import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
+import androidx.appcompat.app.AlertDialog
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.lifecycle.lifecycleScope
+import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivitySimpleMainBinding
 import com.v2ray.ang.enums.PermissionType
@@ -98,6 +104,7 @@ class SimpleMainActivity : HelperBaseActivity() {
         }
 
         checkAndRequestPermission(PermissionType.POST_NOTIFICATIONS) { }
+        maybePromptBatteryOptimizationExemption()
     }
 
     override fun onResume() {
@@ -139,5 +146,63 @@ class SimpleMainActivity : HelperBaseActivity() {
 
     private fun startV2Ray() {
         V2RayServiceManager.startVService(this)
+    }
+
+    private fun maybePromptBatteryOptimizationExemption() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        if (isIgnoringBatteryOptimizations()) return
+        val prompted = MmkvManager.decodeSettingsBool(AppConfig.PREF_VOLKVN_BATTERY_OPT_PROMPTED, false)
+        if (prompted) return
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.volkvn_battery_opt_title)
+            .setMessage(R.string.volkvn_battery_opt_message)
+            .setCancelable(true)
+            .setPositiveButton(R.string.volkvn_battery_opt_allow) { _, _ ->
+                MmkvManager.encodeSettings(AppConfig.PREF_VOLKVN_BATTERY_OPT_PROMPTED, true)
+                openBatteryOptimizationRequest()
+            }
+            .setNeutralButton(R.string.volkvn_battery_opt_open_settings) { _, _ ->
+                MmkvManager.encodeSettings(AppConfig.PREF_VOLKVN_BATTERY_OPT_PROMPTED, true)
+                openBatteryOptimizationSettings()
+            }
+            .setNegativeButton(R.string.volkvn_battery_opt_later) { _, _ ->
+                MmkvManager.encodeSettings(AppConfig.PREF_VOLKVN_BATTERY_OPT_PROMPTED, true)
+            }
+            .show()
+    }
+
+    private fun isIgnoringBatteryOptimizations(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
+        val pm = getSystemService(PowerManager::class.java) ?: return false
+        return pm.isIgnoringBatteryOptimizations(packageName)
+    }
+
+    private fun openBatteryOptimizationRequest() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+            data = Uri.parse("package:$packageName")
+        }
+        runCatching { startActivity(intent) }.onFailure {
+            openBatteryOptimizationSettings()
+        }
+    }
+
+    private fun openBatteryOptimizationSettings() {
+        val intents = listOf(
+            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:$packageName")
+            },
+        )
+        val opened = intents.firstOrNull { intent ->
+            runCatching {
+                startActivity(intent)
+                true
+            }.getOrDefault(false)
+        } != null
+        if (!opened) {
+            toast(R.string.volkvn_battery_opt_open_failed)
+        }
     }
 }

@@ -456,5 +456,11 @@
     <string name="volkvn_err_decode_config">Не удалось прочитать выбранный профиль. Попробуйте обновить список.</string>
     <string name="volkvn_err_invalid_server_address">Некорректный адрес сервера в профиле: %1$s</string>
     <string name="volkvn_err_start_foreground">Не удалось запустить службу: %1$s. Разрешите уведомления, если система запросит.</string>
+    <string name="volkvn_battery_opt_title">Отключите оптимизацию батареи для VolKVN</string>
+    <string name="volkvn_battery_opt_message">На некоторых устройствах система завершает VPN-службу в фоне. Разрешите приложению работу без оптимизации батареи, чтобы подключение не обрывалось.</string>
+    <string name="volkvn_battery_opt_allow">Разрешить</string>
+    <string name="volkvn_battery_opt_open_settings">Открыть настройки</string>
+    <string name="volkvn_battery_opt_later">Позже</string>
+    <string name="volkvn_battery_opt_open_failed">Не удалось открыть настройки батареи.</string>
 
 </resources>

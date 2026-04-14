@@ -463,5 +463,11 @@
     <string name="volkvn_err_decode_config">Could not read the selected profile. Try updating the list.</string>
     <string name="volkvn_err_invalid_server_address">Invalid server address in profile: %1$s</string>
     <string name="volkvn_err_start_foreground">Could not start the background service: %1$s. Grant notifications permission if the system asks.</string>
+    <string name="volkvn_battery_opt_title">Disable battery optimization for VolKVN</string>
+    <string name="volkvn_battery_opt_message">Some devices kill background VPN services aggressively. Allow VolKVN to run without battery optimization so the connection stays alive.</string>
+    <string name="volkvn_battery_opt_allow">Allow</string>
+    <string name="volkvn_battery_opt_open_settings">Open settings</string>
+    <string name="volkvn_battery_opt_later">Later</string>
+    <string name="volkvn_battery_opt_open_failed">Could not open battery settings.</string>
 
 </resources>
