@@ -47,7 +47,7 @@ data class V2rayConfig(
             var accounts: List<SocksAccountBean>? = null,
             var name: String? = null,
             @SerializedName("MTU")
-            var mtu: Int? = null
+            var mtu: Any? = null
         ) {
             data class SocksAccountBean(
                 var user: String = "",
