@@ -1,5 +1,6 @@
 package com.v2ray.ang.util
 
+import android.app.ActivityManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -624,8 +625,25 @@ object Utils {
         }
     }
 
+    /**
+     * True only when **this app's** core/VPN runs in `:RunSoLibV2RayDaemon`.
+     * Do **not** use generic [TRANSPORT_VPN] — another VPN app sets that too and would fake "connected" UI.
+     */
     fun isVpnTransportActive(context: Context): Boolean {
-        return vpnTransportOnAnyNetwork(context.applicationContext)
+        return ourVpnDaemonProcessRunning(context.applicationContext)
+    }
+
+    private fun ourVpnDaemonProcessRunning(context: Context): Boolean {
+        return try {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val suffix = ":RunSoLibV2RayDaemon"
+            val pkg = context.packageName
+            am.runningAppProcesses?.any { p ->
+                p.processName == pkg + suffix || (p.processName.startsWith(pkg) && p.processName.endsWith(suffix))
+            } == true
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun vpnTransportOnAnyNetwork(context: Context): Boolean {
@@ -644,8 +662,11 @@ object Utils {
         }
     }
 
+    /** For debug log only: daemon process + generic VPN transport (may be another app). */
     fun vpnUiDiagnostics(context: Context): String {
-        val vpnAny = vpnTransportOnAnyNetwork(context.applicationContext)
-        return "transportVpnAnyNet=$vpnAny isVpnTransportActive=${isVpnTransportActive(context)}"
+        val app = context.applicationContext
+        val daemon = ourVpnDaemonProcessRunning(app)
+        val transportVpn = vpnTransportOnAnyNetwork(app)
+        return "ourDaemon=$daemon transportVpnAnyNet=$transportVpn isVpnTransportActive=${isVpnTransportActive(app)}"
     }
 }

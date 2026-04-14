@@ -97,20 +97,20 @@ jobs:
           name: playstore-debug-apk
           path: V2rayNG/app/build/outputs/apk/playstore/debug/*.apk
 
-      - name: Move "latest" tag to current commit
+      - name: Prepare release metadata
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -f latest "${GITHUB_SHA}"
-          git push origin refs/tags/latest --force
+          SHORT_SHA="${GITHUB_SHA::7}"
+          TAG="auto-${GITHUB_RUN_NUMBER}-${SHORT_SHA}"
+          echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
+          echo "RELEASE_NAME=Auto build #${GITHUB_RUN_NUMBER} (${SHORT_SHA})" >> "$GITHUB_ENV"
 
-      - name: Publish GitHub Release (latest)
+      - name: Publish GitHub Release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
-          name: Latest build from main
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_NAME }}
           make_latest: true
           generate_release_notes: false
           body: |
