@@ -18,6 +18,12 @@ Android client based on [v2rayNG](https://github.com/2dust/v2rayNG) (GPLv3) with
 
 Application id: `com.volkvn.app` (debug/release). Uninstall any older build signed with a different id before installing.
 
+## Security note (fixed in this fork)
+
+- В этом форке закрыт сценарий, описанный в статье: [Из-за критической уязвимости VLESS клиентов скоро все ваши VPN будут заблокированы](https://habr.com/ru/articles/1020080/).
+- Что сделано: локальный SOCKS в цепочке VPN запускается с авторизацией (random user/pass на сессию), и эти же учётные данные прокидываются в `hev-socks5-tunnel` (режим UDP relay `tcp`), чтобы исключить доступ к loopback SOCKS без валидных credentials.
+- Это снижает риск обхода per-app split tunnel через прямое подключение spyware к localhost SOCKS-порту.
+
 ## Compared to upstream v2rayNG
 
 - **Local SOCKS auth**: each VPN session uses random SOCKS5 username/password on the loopback inbound and matching credentials in `hev-socks5-tunnel` (UDP relay mode `tcp`). This addresses the loopback SOCKS exposure discussed in [this article](https://habr.com/ru/articles/1020080/) (see also [POC](https://github.com/runetfreedom/per-app-split-bypass-poc)).
@@ -32,6 +38,12 @@ Application id: `com.volkvn.app` (debug/release). Uninstall any older build sign
 Кратко: **JDK 17**, **Android SDK** с `sdk.dir` в `V2rayNG/local.properties`, файл **`libv2ray.aar`** в `V2rayNG/app/libs/` ([AndroidLibXrayLite releases](https://github.com/2dust/AndroidLibXrayLite/releases)), затем из каталога `V2rayNG`: `gradlew.bat assemblePlaystoreDebug` (Windows) или `./gradlew assemblePlaystoreDebug` (Unix).
 
 Release signing is up to you. F-Droid flavor uses `applicationIdSuffix ".fdroid"`.
+
+## CI/CD
+
+- После каждого коммита в `main` автоматически запускается GitHub Actions workflow: сборка + тесты.
+- После успешной сборки workflow автоматически обновляет GitHub Release `latest` и прикрепляет APK.
+- Ссылка на актуальный релиз: [https://github.com/shvshnkr/VolKVN/releases/latest](https://github.com/shvshnkr/VolKVN/releases/latest)
 
 ### Debug logs (send to developer)
 
