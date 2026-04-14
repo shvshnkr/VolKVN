@@ -1,6 +1,20 @@
 # VolKVN
 
-Android client based on [v2rayNG](https://github.com/2dust/v2rayNG) (GPLv3) with a **simple mode** for relatives: one switch, public VLESS subscription pools, automatic server pick, and per-app split tunneling toward Telegram, WhatsApp, and YouTube (plus Revanced YouTube when installed).
+## О проекте
+
+Это **форк** Android-клиента **[v2rayNG](https://github.com/2dust/v2rayNG)** (исходный проект под **GNU GPLv3**). База — кодовая база v2rayNG; актуальная сборка этого репозитория указана в `V2rayNG/app/build.gradle.kts` (например, **versionName `1.0.5.0-volkvn`**, **versionCode** см. там же).
+
+Репозиторий ведётся для **обучения и исследования** устройства сетей, VPN, прокси, маршрутизации и смежных механизмов. Материал связан с практикой курса **VibeCode** в среде **Cursor** (vibecode / Cursor).
+
+**Важно:** используйте знания и сборки только в **законных** целях и с соблюдением правил сети, сервисов и применимого законодательства. Публичные списки подписок указывают на сторонние конфигурации — ответственность за соответствие локальным нормам лежит на вас.
+
+---
+
+**English:** This repository is an **educational and research-oriented fork** of [v2rayNG](https://github.com/2dust/v2rayNG) (GPLv3), for studying how network stacks, VPN, and proxy paths behave. It is associated with **VibeCode** coursework using **Cursor**. The fork adds a simplified UI and experiments on top of the upstream app; see `build.gradle.kts` for the exact **versionName** / **versionCode** of this tree.
+
+---
+
+Android client based on [v2rayNG](https://github.com/2dust/v2rayNG) (GPLv3) with a **simple mode**: one switch, public VLESS subscription pools, automatic server pick, and per-app split tunneling toward Telegram, WhatsApp, and YouTube (plus Revanced YouTube when installed).
 
 Application id: `com.volkvn.app` (debug/release). Uninstall any older build signed with a different id before installing.
 
