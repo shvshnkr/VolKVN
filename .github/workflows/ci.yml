@@ -7,7 +7,7 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -96,3 +96,25 @@ jobs:
         with:
           name: playstore-debug-apk
           path: V2rayNG/app/build/outputs/apk/playstore/debug/*.apk
+
+      - name: Move "latest" tag to current commit
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f latest "${GITHUB_SHA}"
+          git push origin refs/tags/latest --force
+
+      - name: Publish GitHub Release (latest)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest build from main
+          make_latest: true
+          generate_release_notes: false
+          body: |
+            Automatic build from `main`.
+            Commit: `${{ github.sha }}`
+          files: |
+            V2rayNG/app/build/outputs/apk/playstore/debug/*.apk
