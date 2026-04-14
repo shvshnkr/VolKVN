@@ -39,6 +39,8 @@ class SimpleMainActivity : HelperBaseActivity() {
     private val mainViewModel: MainViewModel by viewModels()
     private var lastRunningLogged: Boolean? = null
     private var lastPreconnectRefreshAt = 0L
+    private var initialPoolRefreshDone = false
+    private var preconnectRefreshInProgress = false
 
     private val requestVpnPermission = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -103,6 +105,7 @@ class SimpleMainActivity : HelperBaseActivity() {
             } else {
                 getString(R.string.volkvn_simple_status_ready)
             }
+            initialPoolRefreshDone = true
         }
 
         checkAndRequestPermission(PermissionType.POST_NOTIFICATIONS) { }
@@ -119,6 +122,12 @@ class SimpleMainActivity : HelperBaseActivity() {
 
         if (!isChecked) {
             V2RayServiceManager.stopVService(this)
+            return
+        }
+
+        if (!initialPoolRefreshDone) {
+            binding.switchConnect.isChecked = false
+            toast(R.string.volkvn_simple_status_refreshing)
             return
         }
 
@@ -148,9 +157,14 @@ class SimpleMainActivity : HelperBaseActivity() {
 
     private fun startV2RayWithPreflight() {
         lifecycleScope.launch {
+            if (preconnectRefreshInProgress) {
+                VolkvnDebugLog.log(this@SimpleMainActivity, "SimpleMain", "preconnect refresh: skip in progress")
+                return@launch
+            }
             val now = System.currentTimeMillis()
             val needRefresh = now - lastPreconnectRefreshAt >= PRECONNECT_REFRESH_MIN_INTERVAL_MS
             if (needRefresh) {
+                preconnectRefreshInProgress = true
                 binding.tvStatus.text = getString(R.string.volkvn_simple_status_refreshing)
                 VolkvnDebugLog.log(this@SimpleMainActivity, "SimpleMain", "preconnect refresh: start")
                 runCatching {
@@ -163,6 +177,7 @@ class SimpleMainActivity : HelperBaseActivity() {
                     )
                 }
                 lastPreconnectRefreshAt = now
+                preconnectRefreshInProgress = false
             }
             V2RayServiceManager.startVService(this@SimpleMainActivity)
         }

@@ -21,12 +21,23 @@ import com.v2ray.ang.util.Utils
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import libv2ray.CoreCallbackHandler
 import libv2ray.CoreController
 import java.lang.ref.SoftReference
 
 object V2RayServiceManager {
+    private const val WATCHDOG_INTERVAL_MS = 4 * 60 * 1000L
+    private const val WATCHDOG_INITIAL_DELAY_MS = 90 * 1000L
+    private const val WATCHDOG_FAILURE_THRESHOLD = 2
+
+    private val watchdogScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var watchdogJob: Job? = null
 
     private val coreController: CoreController = V2RayNativeManager.newCoreController(CoreCallback())
     private val mMsgReceive = ReceiveMessageHandler()
@@ -234,6 +245,7 @@ object V2RayServiceManager {
         try {
             MessageUtil.sendMsg2UI(service, AppConfig.MSG_STATE_START_SUCCESS, "")
             NotificationManager.startSpeedNotification(currentConfig)
+            startConnectionWatchdog(service)
             Log.i(AppConfig.TAG, "StartCore-Manager: Core started successfully")
         } catch (e: Exception) {
             return fail(service, "post-start notification/UI failed", e)
@@ -248,6 +260,7 @@ object V2RayServiceManager {
      */
     fun stopCoreLoop(): Boolean {
         val service = getService() ?: return false
+        stopConnectionWatchdog()
 
         if (coreController.isRunning) {
             CoroutineScope(Dispatchers.IO).launch {
@@ -276,6 +289,70 @@ object V2RayServiceManager {
         }
 
         return true
+    }
+
+    private fun startConnectionWatchdog(service: Service) {
+        stopConnectionWatchdog()
+        watchdogJob = watchdogScope.launch {
+            var consecutiveFailures = 0
+            delay(WATCHDOG_INITIAL_DELAY_MS)
+            while (isActive) {
+                if (!coreController.isRunning) {
+                    delay(10_000)
+                    continue
+                }
+                val (ok, detail) = probeCoreHealth()
+                if (ok) {
+                    if (consecutiveFailures > 0) {
+                        VolkvnDebugLog.log(service, "Watchdog", "health restored")
+                    }
+                    consecutiveFailures = 0
+                } else {
+                    consecutiveFailures += 1
+                    VolkvnDebugLog.log(
+                        service,
+                        "Watchdog",
+                        "health probe failed ($consecutiveFailures/$WATCHDOG_FAILURE_THRESHOLD): $detail",
+                    )
+                    if (consecutiveFailures >= WATCHDOG_FAILURE_THRESHOLD) {
+                        val failedGuid = MmkvManager.getSelectServer()
+                        val targetSubId = currentConfig?.subscriptionId ?: AppConfig.VOLKVN_SUBSCRIPTION_ID
+                        VolkvnDebugLog.log(service, "Watchdog", "auto-recover: reselect + restart (reason=$detail)")
+                        VolkvnServerSelector.markServerUnhealthy(failedGuid, "watchdog:$detail")
+                        runCatching {
+                            VolkvnServerSelector.pickBestServer(targetSubId)
+                        }
+                        withContext(Dispatchers.Main) {
+                            stopVService(service)
+                            delay(700)
+                            startVService(service)
+                        }
+                        consecutiveFailures = 0
+                    }
+                }
+                delay(WATCHDOG_INTERVAL_MS)
+            }
+        }
+    }
+
+    private fun stopConnectionWatchdog() {
+        watchdogJob?.cancel()
+        watchdogJob = null
+    }
+
+    private fun probeCoreHealth(): Pair<Boolean, String> {
+        return runCatching {
+            val primary = coreController.measureDelay(SettingsManager.getDelayTestUrl())
+            if (primary >= 0) return true to "ok($primary)"
+            val fallback = coreController.measureDelay(SettingsManager.getDelayTestUrl(true))
+            if (fallback >= 0) {
+                true to "ok-fallback($fallback)"
+            } else {
+                false to "delay=-1"
+            }
+        }.getOrElse { e ->
+            false to (e.message ?: e.javaClass.simpleName)
+        }
     }
 
     /**

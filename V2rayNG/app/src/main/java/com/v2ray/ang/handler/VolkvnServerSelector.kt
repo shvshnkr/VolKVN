@@ -7,6 +7,7 @@ import com.v2ray.ang.enums.EConfigType
 import java.net.InetSocketAddress
 import java.net.Socket
 import kotlin.random.Random
+import kotlin.math.roundToLong
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -24,6 +25,29 @@ object VolkvnServerSelector {
     private const val SECOND_WAVE = 72
     /** Avoid opening too many sockets at once on low-end devices. */
     private const val PARALLEL_PROBES = 20
+    /** Re-check the top candidates to avoid bursty/unstable picks. */
+    private const val TOP_RECHECK_COUNT = 10
+    private const val TOP_RECHECK_ATTEMPTS = 3
+    /** Temporarily avoid unstable endpoints after runtime failures. */
+    private const val UNHEALTHY_COOLDOWN_MS = 20 * 60 * 1000L
+    private val unhealthyUntilMs = HashMap<String, Long>()
+
+    @Synchronized
+    fun markServerUnhealthy(guid: String?, reason: String) {
+        if (guid.isNullOrBlank()) return
+        unhealthyUntilMs[guid] = SystemClock.elapsedRealtime() + UNHEALTHY_COOLDOWN_MS
+        Log.w(TAG, "Mark unhealthy guid=$guid cooldown=${UNHEALTHY_COOLDOWN_MS}ms reason=$reason")
+    }
+
+    @Synchronized
+    private fun isServerOnCooldown(guid: String): Boolean {
+        val until = unhealthyUntilMs[guid] ?: return false
+        if (SystemClock.elapsedRealtime() >= until) {
+            unhealthyUntilMs.remove(guid)
+            return false
+        }
+        return true
+    }
 
     /**
      * TCP connect probe; returns [Long.MAX_VALUE] on failure.
@@ -54,6 +78,37 @@ object VolkvnServerSelector {
 
     private data class Row(val guid: String, val latency: Long, val profile: ProfileItem)
 
+    private fun stableLatencyMs(profile: ProfileItem, attempts: Int): Long {
+        val host = profile.server
+        val port = profile.serverPort?.toIntOrNull() ?: return Long.MAX_VALUE
+        if (attempts <= 1) return tcpLatencyMs(host, port)
+        val samples = ArrayList<Long>(attempts)
+        repeat(attempts) {
+            val t = tcpLatencyMs(host, port)
+            if (t < Long.MAX_VALUE) samples.add(t)
+        }
+        if (samples.isEmpty()) return Long.MAX_VALUE
+        return (samples.average()).roundToLong()
+    }
+
+    private suspend fun refineTopCandidates(alive: List<Row>): List<Row> = withContext(Dispatchers.IO) {
+        if (alive.size <= 1) return@withContext alive
+        val head = alive.take(minOf(TOP_RECHECK_COUNT, alive.size))
+        val refined = coroutineScope {
+            head.map { row ->
+                async(Dispatchers.IO) {
+                    row.copy(latency = stableLatencyMs(row.profile, TOP_RECHECK_ATTEMPTS))
+                }
+            }.awaitAll()
+        }
+        val refinedAlive = refined.filter { it.latency < Long.MAX_VALUE }.sortedBy { it.latency }
+        if (refinedAlive.isNotEmpty()) {
+            refinedAlive
+        } else {
+            alive
+        }
+    }
+
     private suspend fun probeGuidsParallel(guids: List<String>): List<Row> = withContext(Dispatchers.IO) {
         if (guids.isEmpty()) return@withContext emptyList()
         val out = ArrayList<Row>(guids.size)
@@ -80,7 +135,9 @@ object VolkvnServerSelector {
         val guids = MmkvManager.decodeServerList(subscriptionId)
         if (guids.isEmpty()) return
 
-        val order = guids.shuffled()
+        val eligible = guids.filterNot { isServerOnCooldown(it) }
+        val pool = if (eligible.isNotEmpty()) eligible else guids
+        val order = pool.shuffled()
         var rows = probeGuidsParallel(order.take(minOf(FIRST_WAVE, order.size)))
         var alive = rows.filter { it.latency < Long.MAX_VALUE }.sortedBy { it.latency }
 
@@ -88,6 +145,9 @@ object VolkvnServerSelector {
             val rest = order.drop(FIRST_WAVE).take(minOf(SECOND_WAVE, order.size - FIRST_WAVE))
             rows = probeGuidsParallel(rest)
             alive = rows.filter { it.latency < Long.MAX_VALUE }.sortedBy { it.latency }
+        }
+        if (alive.isNotEmpty()) {
+            alive = refineTopCandidates(alive)
         }
 
         val pick = when {
@@ -102,8 +162,7 @@ object VolkvnServerSelector {
                 Log.w(TAG, "No TCP probe succeeded in sampled waves; fallback random guid=$guid (${p.remarks})")
                 Row(guid, Long.MAX_VALUE, p)
             }
-            alive.size <= 3 -> alive.random()
-            else -> alive.take(3).random()
+            else -> alive.first()
         }
 
         MmkvManager.setSelectServer(pick.guid)

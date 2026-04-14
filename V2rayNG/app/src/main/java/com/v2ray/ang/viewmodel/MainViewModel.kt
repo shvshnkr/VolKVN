@@ -118,10 +118,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         !selectedSubId.isNullOrBlank() -> selectedSubId
                         else -> AppConfig.VOLKVN_SUBSCRIPTION_ID
                     }
+                VolkvnServerSelector.markServerUnhealthy(selectedGuid, "autoRecover:$reason")
                 VolkvnServerSelector.pickBestServer(targetSubId)
-                V2RayServiceManager.stopVService(app)
-                delay(450)
-                V2RayServiceManager.startVService(app)
+                withContext(Dispatchers.Main) {
+                    V2RayServiceManager.stopVService(app)
+                    delay(450)
+                    V2RayServiceManager.startVService(app)
+                }
             } catch (e: Exception) {
                 VolkvnDebugLog.log(app, "MainVM", "autoRecover failed: ${e.message ?: e.javaClass.simpleName}")
             } finally {

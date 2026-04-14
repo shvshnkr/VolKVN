@@ -110,6 +110,7 @@ object V2rayConfigManager {
             val obj = JsonUtil.parseString(json) ?: return
             if (!obj.has("inbounds") || !obj["inbounds"].isJsonArray) return
             val inbounds = obj["inbounds"].asJsonArray
+            if (inbounds.size() == 0) return
             val sb = StringBuilder()
             val max = minOf(inbounds.size(), 8)
             for (i in 0 until max) {
@@ -221,7 +222,8 @@ object V2rayConfigManager {
         // add tun inbound from template
         val templateConfig = initV2rayConfig(context) ?: return result
         val inboundTun = templateConfig.inbounds.firstOrNull { it.tag == "tun" } ?: return result
-        inboundTun.settings?.mtu = listOf(SettingsManager.getVpnMtu())
+        // Keep MTU unset to stay compatible across Xray core schemas (uint32 vs []uint32).
+        inboundTun.settings?.mtu = null
 
         // add to json
         inboundsJson.add(JsonUtil.parseString(JsonUtil.toJson(inboundTun)))
@@ -586,7 +588,8 @@ object V2rayConfigManager {
 
             if (needTun()) {
                 val inboundTun = v2rayConfig.inbounds.firstOrNull { e -> e.tag == "tun" }
-                inboundTun?.settings?.mtu = listOf(SettingsManager.getVpnMtu())
+                // Keep MTU unset to stay compatible across Xray core schemas (uint32 vs []uint32).
+                inboundTun?.settings?.mtu = null
                 inboundTun?.sniffing = inbound1.sniffing
             }
         } catch (e: Exception) {
