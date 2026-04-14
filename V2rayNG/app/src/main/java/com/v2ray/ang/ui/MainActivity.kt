@@ -33,6 +33,7 @@ import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.V2RayServiceManager
+import com.v2ray.ang.handler.VolkvnVpnBootstrap
 import com.v2ray.ang.util.Utils
 import com.v2ray.ang.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +42,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelectedListener {
+    companion object {
+        private const val PRECONNECT_REFRESH_MIN_INTERVAL_MS = 45_000L
+    }
+
     private val binding by lazy {
         ActivityMainBinding.inflate(layoutInflater)
     }
@@ -48,10 +53,11 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     val mainViewModel: MainViewModel by viewModels()
     private lateinit var groupPagerAdapter: GroupPagerAdapter
     private var tabMediator: TabLayoutMediator? = null
+    private var lastPreconnectRefreshAt = 0L
 
     private val requestVpnPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (it.resultCode == RESULT_OK) {
-            startV2Ray()
+            startV2RayWithPreflight()
         }
     }
     private val requestActivityLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -159,12 +165,12 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         } else if (SettingsManager.isVpnMode()) {
             val intent = VpnService.prepare(this)
             if (intent == null) {
-                startV2Ray()
+                startV2RayWithPreflight()
             } else {
                 requestVpnPermission.launch(intent)
             }
         } else {
-            startV2Ray()
+            startV2RayWithPreflight()
         }
     }
 
@@ -183,6 +189,19 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
             return
         }
         V2RayServiceManager.startVService(this)
+    }
+
+    private fun startV2RayWithPreflight() {
+        lifecycleScope.launch {
+            val now = System.currentTimeMillis()
+            if (now - lastPreconnectRefreshAt >= PRECONNECT_REFRESH_MIN_INTERVAL_MS) {
+                runCatching {
+                    VolkvnVpnBootstrap.refreshServersAndSelectBest(this@MainActivity)
+                }
+                lastPreconnectRefreshAt = now
+            }
+            startV2Ray()
+        }
     }
 
     fun restartV2Ray() {

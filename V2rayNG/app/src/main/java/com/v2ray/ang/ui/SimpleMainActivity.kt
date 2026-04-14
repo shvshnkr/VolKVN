@@ -32,17 +32,19 @@ class SimpleMainActivity : HelperBaseActivity() {
 
     companion object {
         const val EXTRA_FROM_SIMPLE = "from_simple"
+        private const val PRECONNECT_REFRESH_MIN_INTERVAL_MS = 45_000L
     }
 
     private lateinit var binding: ActivitySimpleMainBinding
     private val mainViewModel: MainViewModel by viewModels()
     private var lastRunningLogged: Boolean? = null
+    private var lastPreconnectRefreshAt = 0L
 
     private val requestVpnPermission = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
         if (result.resultCode == RESULT_OK) {
-            startV2Ray()
+            startV2RayWithPreflight()
         } else {
             binding.switchConnect.isChecked = false
             toast(R.string.toast_permission_denied)
@@ -135,17 +137,35 @@ class SimpleMainActivity : HelperBaseActivity() {
         if (SettingsManager.isVpnMode()) {
             val intent = VpnService.prepare(this)
             if (intent == null) {
-                startV2Ray()
+                startV2RayWithPreflight()
             } else {
                 requestVpnPermission.launch(intent)
             }
         } else {
-            startV2Ray()
+            startV2RayWithPreflight()
         }
     }
 
-    private fun startV2Ray() {
-        V2RayServiceManager.startVService(this)
+    private fun startV2RayWithPreflight() {
+        lifecycleScope.launch {
+            val now = System.currentTimeMillis()
+            val needRefresh = now - lastPreconnectRefreshAt >= PRECONNECT_REFRESH_MIN_INTERVAL_MS
+            if (needRefresh) {
+                binding.tvStatus.text = getString(R.string.volkvn_simple_status_refreshing)
+                VolkvnDebugLog.log(this@SimpleMainActivity, "SimpleMain", "preconnect refresh: start")
+                runCatching {
+                    VolkvnVpnBootstrap.refreshServersAndSelectBest(this@SimpleMainActivity)
+                }.onFailure {
+                    VolkvnDebugLog.log(
+                        this@SimpleMainActivity,
+                        "SimpleMain",
+                        "preconnect refresh failed: ${it.message ?: it.javaClass.simpleName}",
+                    )
+                }
+                lastPreconnectRefreshAt = now
+            }
+            V2RayServiceManager.startVService(this@SimpleMainActivity)
+        }
     }
 
     private fun maybePromptBatteryOptimizationExemption() {
