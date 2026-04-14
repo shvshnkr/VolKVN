@@ -36,13 +36,29 @@ jobs:
         with:
           packages: "platform-tools platforms;android-36 build-tools;36.0.0"
 
-      - name: Download libv2ray.aar
-        uses: robinraju/release-downloader@v1.12
-        with:
-          repository: 2dust/AndroidLibXrayLite
-          latest: true
-          fileName: libv2ray.aar
-          out-file-path: V2rayNG/app/libs/
+      - name: Download libv2ray.aar (latest release)
+        run: |
+          mkdir -p V2rayNG/app/libs
+          API_URL="https://api.github.com/repos/2dust/AndroidLibXrayLite/releases/latest"
+          curl -fsSL \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "$API_URL" > /tmp/androidlibxraylite_latest.json
+          DOWNLOAD_URL="$(python3 - <<'PY'
+          import json
+          with open('/tmp/androidlibxraylite_latest.json', 'r', encoding='utf-8') as f:
+              data = json.load(f)
+          for asset in data.get('assets', []):
+              if asset.get('name') == 'libv2ray.aar':
+                  print(asset.get('browser_download_url', ''))
+                  break
+          PY
+          )"
+          if [ -z "$DOWNLOAD_URL" ]; then
+            echo "libv2ray.aar asset not found in latest release"
+            exit 1
+          fi
+          curl -fL "$DOWNLOAD_URL" -o V2rayNG/app/libs/libv2ray.aar
 
       - name: Prepare Gradle wrapper
         working-directory: V2rayNG
