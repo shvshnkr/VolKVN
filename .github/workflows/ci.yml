@@ -36,16 +36,11 @@ jobs:
         with:
           packages: "platform-tools platforms;android-36 build-tools;36.0.0"
 
-      - name: Resolve AndroidLibXrayLite tag from submodule
-        run: |
-          TAG="$(git -C AndroidLibXrayLite describe --tags --abbrev=0)"
-          echo "CURRENT_TAG=$TAG" >> "$GITHUB_ENV"
-
       - name: Download libv2ray.aar
         uses: robinraju/release-downloader@v1.12
         with:
           repository: 2dust/AndroidLibXrayLite
-          tag: ${{ env.CURRENT_TAG }}
+          latest: true
           fileName: libv2ray.aar
           out-file-path: V2rayNG/app/libs/
 
