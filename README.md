@@ -58,6 +58,12 @@ adb logcat | findstr /i "volkvn com.volkvn.app GoLog"
 
 Copy lines from pressing Connect until the error appears.
 
+## Disclaimer / «Как есть»
+
+**Русский.** Программное обеспечение из этого репозитория предоставляется **«как есть» (as is)**. **Никаких гарантий** не даётся: ни явных, ни подразумеваемых, в том числе пригодности для какой-либо цели, работоспособности, безопасности, отсутствия ошибок или непрерывности работы. Авторы и участники **не несут ответственности** за прямой или косвенный ущерб, потерю данных, нарушение условий третьих сторон или правовые последствия использования. Вы пользуетесь кодом и сборками **на свой страх и риск**. Инструкции, версии зависимостей и сценарии сборки могут устаревать — **проверяйте сами**.
+
+**English.** The software in this repository is provided **“as is”**, **without warranty of any kind**, express or implied, including but not limited to merchantability, fitness for a particular purpose, security, correctness, or uninterrupted operation. **No guarantees.** To the maximum extent permitted by law, the authors and contributors **disclaim liability** for any damages, data loss, third-party claims, or legal consequences arising from use of this project. **Use at your own risk.** Build steps and dependency choices may become outdated — **verify yourself**.
+
 ## Legal
 
 - This repository is a **derivative of v2rayNG** and remains under **GNU GPLv3** (see upstream license).
