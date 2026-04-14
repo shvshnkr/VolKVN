@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platform-tools
+            platforms;android-36
+            build-tools;36.0.0
+
+      - name: Resolve AndroidLibXrayLite tag from submodule
+        run: |
+          TAG="$(git -C AndroidLibXrayLite describe --tags --abbrev=0)"
+          echo "CURRENT_TAG=$TAG" >> "$GITHUB_ENV"
+
+      - name: Download libv2ray.aar
+        uses: robinraju/release-downloader@v1.12
+        with:
+          repository: 2dust/AndroidLibXrayLite
+          tag: ${{ env.CURRENT_TAG }}
+          fileName: libv2ray.aar
+          out-file-path: V2rayNG/app/libs/
+
+      - name: Prepare Gradle wrapper
+        working-directory: V2rayNG
+        run: |
+          echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
+          chmod +x gradlew
+
+      - name: Build
+        working-directory: V2rayNG
+        run: ./gradlew --no-daemon assemblePlaystoreDebug
+
+      - name: Test
+        working-directory: V2rayNG
+        run: ./gradlew --no-daemon test
+
+      - name: Upload APK artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playstore-debug-apk
+          path: V2rayNG/app/build/outputs/apk/playstore/debug/*.apk
