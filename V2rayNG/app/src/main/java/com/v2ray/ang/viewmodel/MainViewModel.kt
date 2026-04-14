@@ -28,18 +28,25 @@ import com.v2ray.ang.handler.VolkvnDebugLog
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SpeedtestManager
+import com.v2ray.ang.handler.V2RayServiceManager
+import com.v2ray.ang.handler.VolkvnServerSelector
 import com.v2ray.ang.util.MessageUtil
 import com.v2ray.ang.util.Utils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Collections
 import java.util.regex.PatternSyntaxException
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
+    companion object {
+        private const val AUTO_RECOVER_MIN_INTERVAL_MS = 12_000L
+    }
+
     private var serverList = mutableListOf<String>() // MmkvManager.decodeServerList()
     var subscriptionId: String = MmkvManager.decodeSettingsString(AppConfig.CACHE_SUBSCRIPTION_ID, "").orEmpty()
     var keywordFilter = ""
@@ -54,6 +61,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * While false, do not use process presence to force [isRunning] true (would block reconnect: switch already "on").
      */
     private var trustDaemonProcessForOptimisticUi: Boolean = true
+    private var autoRecoverInProgress = false
+    private var lastAutoRecoverAt = 0L
 
     /**
      * Refer to the official documentation for [registerReceiver](https://developer.android.com/reference/androidx/core/content/ContextCompat#registerReceiver(android.content.Context,android.content.BroadcastReceiver,android.content.IntentFilter,int):
@@ -71,9 +80,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun queryServiceRunningState() {
         val app = getApplication<AngApplication>()
+        val transportActive = Utils.isVpnTransportActive(app)
         val vpnUp =
             SettingsManager.isVpnMode() &&
-                Utils.isVpnTransportActive(app) &&
+                transportActive &&
                 trustDaemonProcessForOptimisticUi
         VolkvnDebugLog.log(
             app,
@@ -82,8 +92,42 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         if (vpnUp) {
             isRunning.value = true
+        } else if (SettingsManager.isVpnMode() && isRunning.value == true && !transportActive) {
+            maybeAutoRecoverConnection("query running=true but transport down")
         }
         MessageUtil.sendMsg2Service(app, AppConfig.MSG_REGISTER_CLIENT, "")
+    }
+
+    private fun maybeAutoRecoverConnection(reason: String) {
+        if (!SettingsManager.isVpnMode()) return
+        val app = getApplication<AngApplication>()
+        val now = System.currentTimeMillis()
+        if (autoRecoverInProgress || now - lastAutoRecoverAt < AUTO_RECOVER_MIN_INTERVAL_MS) {
+            return
+        }
+        autoRecoverInProgress = true
+        lastAutoRecoverAt = now
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                VolkvnDebugLog.log(app, "MainVM", "autoRecover start: $reason")
+                val selectedGuid = MmkvManager.getSelectServer()
+                val selectedSubId = selectedGuid?.let { MmkvManager.decodeServerConfig(it)?.subscriptionId }
+                val targetSubId =
+                    when {
+                        !subscriptionId.isNullOrBlank() -> subscriptionId
+                        !selectedSubId.isNullOrBlank() -> selectedSubId
+                        else -> AppConfig.VOLKVN_SUBSCRIPTION_ID
+                    }
+                VolkvnServerSelector.pickBestServer(targetSubId)
+                V2RayServiceManager.stopVService(app)
+                delay(450)
+                V2RayServiceManager.startVService(app)
+            } catch (e: Exception) {
+                VolkvnDebugLog.log(app, "MainVM", "autoRecover failed: ${e.message ?: e.javaClass.simpleName}")
+            } finally {
+                autoRecoverInProgress = false
+            }
+        }
     }
 
     /**
@@ -478,12 +522,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                 AppConfig.MSG_STATE_NOT_RUNNING -> {
                     val app = getApplication<AngApplication>()
+                    val transportActive = Utils.isVpnTransportActive(app)
                     val live =
                         SettingsManager.isVpnMode() &&
-                            Utils.isVpnTransportActive(app) &&
+                            transportActive &&
                             trustDaemonProcessForOptimisticUi
                     isRunning.value = live
                     VolkvnDebugLog.log(app, "MainVM", "broadcast NOT_RUNNING live=$live ${Utils.vpnUiDiagnostics(app)}")
+                    if (trustDaemonProcessForOptimisticUi && !live && !transportActive) {
+                        maybeAutoRecoverConnection("broadcast NOT_RUNNING while daemon trusted")
+                    }
                 }
 
                 AppConfig.MSG_STATE_START_SUCCESS -> {
@@ -498,6 +546,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     getApplication<AngApplication>().toastError(R.string.toast_services_failure)
                     isRunning.value = false
                     VolkvnDebugLog.log(getApplication(), "MainVM", "broadcast START_FAILURE")
+                    maybeAutoRecoverConnection("broadcast START_FAILURE")
                 }
 
                 AppConfig.MSG_STATE_STOP_SUCCESS -> {

@@ -8,6 +8,11 @@
         app:actionViewClass="androidx.appcompat.widget.SearchView"
         app:showAsAction="always|collapseActionView" />
     <item
+        android:id="@+id/real_ping_all_quick"
+        android:icon="@drawable/ic_check_update_24dp"
+        android:title="@string/title_real_ping_all_server"
+        app:showAsAction="ifRoom" />
+    <item
         android:icon="@drawable/ic_add_24dp"
         android:title="@string/menu_item_add_config"
         app:showAsAction="ifRoom">
