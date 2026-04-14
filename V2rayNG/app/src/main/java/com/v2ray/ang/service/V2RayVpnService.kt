@@ -121,6 +121,7 @@ class V2RayVpnService : VpnService(), ServiceControl {
         }
         if (!V2RayServiceManager.startCoreLoop(mInterface)) {
             Log.e(AppConfig.TAG, "StartCore-VPN: Failed to start core loop")
+            com.v2ray.ang.handler.VolkvnDebugLog.log(this, "V2RayVpnService", "startCoreLoop returned false; calling stopAllService")
             stopAllService()
             return
         }
