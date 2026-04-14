@@ -35,9 +35,13 @@ object V2RayServiceManager {
     private const val WATCHDOG_INTERVAL_MS = 4 * 60 * 1000L
     private const val WATCHDOG_INITIAL_DELAY_MS = 90 * 1000L
     private const val WATCHDOG_FAILURE_THRESHOLD = 2
+    private const val NETWORK_HANDOFF_GRACE_MS = 4_000L
+    private const val NETWORK_HANDOFF_MIN_INTERVAL_MS = 30_000L
 
     private val watchdogScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var watchdogJob: Job? = null
+    private var networkRecoveryInProgress = false
+    private var lastNetworkHandoffRecoveryAt = 0L
 
     private val coreController: CoreController = V2RayNativeManager.newCoreController(CoreCallback())
     private val mMsgReceive = ReceiveMessageHandler()
@@ -338,6 +342,35 @@ object V2RayServiceManager {
     private fun stopConnectionWatchdog() {
         watchdogJob?.cancel()
         watchdogJob = null
+    }
+
+    fun onUnderlyingNetworkChanged(reason: String) {
+        val service = getService() ?: return
+        if (!coreController.isRunning) return
+        val now = System.currentTimeMillis()
+        if (networkRecoveryInProgress || now - lastNetworkHandoffRecoveryAt < NETWORK_HANDOFF_MIN_INTERVAL_MS) {
+            return
+        }
+        networkRecoveryInProgress = true
+        lastNetworkHandoffRecoveryAt = now
+        watchdogScope.launch {
+            try {
+                delay(NETWORK_HANDOFF_GRACE_MS)
+                val (ok, detail) = probeCoreHealth()
+                if (!ok) {
+                    VolkvnDebugLog.log(service, "Watchdog", "network handoff recover ($reason): $detail")
+                    withContext(Dispatchers.Main) {
+                        stopVService(service)
+                        delay(700)
+                        startVService(service)
+                    }
+                } else {
+                    VolkvnDebugLog.log(service, "Watchdog", "network handoff healthy ($reason): $detail")
+                }
+            } finally {
+                networkRecoveryInProgress = false
+            }
+        }
     }
 
     private fun probeCoreHealth(): Pair<Boolean, String> {

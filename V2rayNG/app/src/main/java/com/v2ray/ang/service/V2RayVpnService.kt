@@ -60,15 +60,18 @@ class V2RayVpnService : VpnService(), ServiceControl {
         object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 setUnderlyingNetworks(arrayOf(network))
+                V2RayServiceManager.onUnderlyingNetworkChanged("onAvailable")
             }
 
             override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
                 // it's a good idea to refresh capabilities
                 setUnderlyingNetworks(arrayOf(network))
+                V2RayServiceManager.onUnderlyingNetworkChanged("onCapabilitiesChanged")
             }
 
             override fun onLost(network: Network) {
                 setUnderlyingNetworks(null)
+                V2RayServiceManager.onUnderlyingNetworkChanged("onLost")
             }
         }
     }
