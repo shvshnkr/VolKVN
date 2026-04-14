@@ -27,13 +27,9 @@ Application id: `com.volkvn.app` (debug/release). Uninstall any older build sign
 
 ## Build
 
-1. **Android SDK** — full SDK (not only platform-tools): `platforms;android-36`, `build-tools`, **cmdline-tools**, then `sdkmanager --licenses`. Set `sdk.dir` in `V2rayNG/local.properties` (example: `sdk.dir=C:/Android/sdk`).
-2. **`libv2ray.aar`** — not stored in git. Download the asset matching [AndroidLibXrayLite releases](https://github.com/2dust/AndroidLibXrayLite/releases) (file `libv2ray.aar`) into `V2rayNG/app/libs/`. Upstream CI uses the tag from the `AndroidLibXrayLite` submodule.
-3. **JDK 17** and Gradle: `cd V2rayNG` then:
+Пошаговая инструкция: **[docs/BUILD.md](docs/BUILD.md)** (Windows — по шагам; Linux/macOS — по аналогии, **не проверялось** в этом репозитории).
 
-```bash
-./gradlew assemblePlaystoreDebug
-```
+Кратко: **JDK 17**, **Android SDK** с `sdk.dir` в `V2rayNG/local.properties`, файл **`libv2ray.aar`** в `V2rayNG/app/libs/` ([AndroidLibXrayLite releases](https://github.com/2dust/AndroidLibXrayLite/releases)), затем из каталога `V2rayNG`: `gradlew.bat assemblePlaystoreDebug` (Windows) или `./gradlew assemblePlaystoreDebug` (Unix).
 
 Release signing is up to you. F-Droid flavor uses `applicationIdSuffix ".fdroid"`.
 
