@@ -35,6 +35,16 @@ object Utils {
     private val IPV4_REGEX =
         Regex("^([01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5])\\.([01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5])\\.([01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5])\\.([01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5])$")
     private val IPV6_REGEX = Regex("^((?:[0-9A-Fa-f]{1,4}))?((?::[0-9A-Fa-f]{1,4}))*::((?:[0-9A-Fa-f]{1,4}))?((?::[0-9A-Fa-f]{1,4}))*|((?:[0-9A-Fa-f]{1,4}))((?::[0-9A-Fa-f]{1,4})){7}$")
+    
+    private fun safeLogError(message: String, throwable: Throwable? = null) {
+        runCatching {
+            if (throwable == null) {
+                Log.e(AppConfig.TAG, message)
+            } else {
+                Log.e(AppConfig.TAG, message, throwable)
+            }
+        }
+    }
 
     /**
      * Convert string to editable for Kotlin.
@@ -180,6 +190,11 @@ object Utils {
                 addr = addr.drop(8).replace("]", "")
             }
 
+            // IPv6 host with port notation: [2605:...]:443
+            if (addr.startsWith("[") && addr.contains("]:")) {
+                addr = addr.substring(0, addr.indexOf("]:") + 1)
+            }
+
             val octets = addr.split('.')
             if (octets.size == 4) {
                 if (octets[3].contains(":")) {
@@ -190,7 +205,7 @@ object Utils {
 
             return isIpv6Address(addr)
         } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to validate IP address", e)
+            safeLogError("Failed to validate IP address", e)
             return false
         }
     }
@@ -569,7 +584,10 @@ object Utils {
             if (!isIpAddress(ip)) return false
 
             // Parse CIDR (e.g., "192.168.1.0/24")
-            val (cidrIp, prefixLen) = cidr.split("/")
+            val parts = cidr.split("/")
+            if (parts.size != 2) return false
+            val cidrIp = parts[0]
+            val prefixLen = parts[1]
             val prefixLength = prefixLen.toInt()
 
             // Convert IP and CIDR's IP portion to Long
@@ -582,7 +600,7 @@ object Utils {
             // Check if they're in the same subnet
             return (ipLong and mask) == (cidrIpLong and mask)
         } catch (e: Exception) {
-            Log.e(AppConfig.TAG, "Failed to check if IP is in CIDR", e)
+            safeLogError("Failed to check if IP is in CIDR", e)
             return false
         }
     }
