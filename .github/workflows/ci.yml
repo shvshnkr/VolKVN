@@ -66,6 +66,22 @@ jobs:
           echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
           chmod +x gradlew
 
+      - name: Ensure gradle-wrapper.jar exists
+        working-directory: V2rayNG
+        run: |
+          if [ -f gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "gradle-wrapper.jar already present"
+            exit 0
+          fi
+          DIST_URL="$(sed -n 's/^distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-\(.*\)-bin.zip$/\1/p' gradle/wrapper/gradle-wrapper.properties)"
+          if [ -z "$DIST_URL" ]; then
+            echo "Cannot resolve Gradle version from gradle-wrapper.properties"
+            exit 1
+          fi
+          JAR_URL="https://raw.githubusercontent.com/gradle/gradle/v${DIST_URL}/gradle/wrapper/gradle-wrapper.jar"
+          echo "Downloading wrapper jar from ${JAR_URL}"
+          curl -fL "$JAR_URL" -o gradle/wrapper/gradle-wrapper.jar
+
       - name: Build
         working-directory: V2rayNG
         run: ./gradlew --no-daemon assemblePlaystoreDebug
