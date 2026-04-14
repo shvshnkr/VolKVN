@@ -548,10 +548,9 @@ object V2rayConfigManager {
                 val localCred = lpUser.isNotEmpty() && lpPass.isNotEmpty()
                 val account = if (localCred) {
                     listOf(
-                        V2rayConfig.InboundBean.InSettingsBean.SocksInboundAccountBean(
+                        V2rayConfig.InboundBean.InSettingsBean.SocksAccountBean(
                             user = lpUser,
                             pass = lpPass,
-                            level = AppConfig.DEFAULT_LEVEL,
                         ),
                     )
                 } else {

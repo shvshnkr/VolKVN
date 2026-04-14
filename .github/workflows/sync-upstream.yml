@@ -1,0 +1,55 @@
+name: Sync Upstream (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_branch:
+        description: "Upstream branch to sync from"
+        required: true
+        default: "master"
+      target_branch:
+        description: "Fork branch to update"
+        required: true
+        default: "main"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.target_branch }}
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Add/fetch upstream
+        run: |
+          git remote add upstream https://github.com/2dust/v2rayNG.git || true
+          git fetch upstream --prune
+
+      - name: Create sync branch and merge upstream
+        run: |
+          SYNC_BRANCH="sync-upstream-${{ github.event.inputs.upstream_branch }}-$(date +%Y%m%d-%H%M%S)"
+          echo "SYNC_BRANCH=$SYNC_BRANCH" >> "$GITHUB_ENV"
+          git checkout -b "$SYNC_BRANCH"
+          git merge --no-ff "upstream/${{ github.event.inputs.upstream_branch }}" -m "Merge upstream/${{ github.event.inputs.upstream_branch }} into ${{ github.event.inputs.target_branch }}"
+
+      - name: Push sync branch
+        run: git push origin "$SYNC_BRANCH"
+
+      - name: Summary
+        run: |
+          echo "Upstream sync branch pushed: $SYNC_BRANCH"
+          echo "Open a PR into ${{ github.event.inputs.target_branch }} after conflict/build review."

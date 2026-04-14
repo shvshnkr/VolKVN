@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration.UI_MODE_NIGHT_MASK
 import android.content.res.Configuration.UI_MODE_NIGHT_NO
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.LocaleList
 import android.provider.Settings
@@ -620,5 +622,30 @@ object Utils {
             Log.e(AppConfig.TAG, "Failed to format timestamp", e)
             ""
         }
+    }
+
+    fun isVpnTransportActive(context: Context): Boolean {
+        return vpnTransportOnAnyNetwork(context.applicationContext)
+    }
+
+    private fun vpnTransportOnAnyNetwork(context: Context): Boolean {
+        return try {
+            val cm = context.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                cm.allNetworks.any { n ->
+                    cm.getNetworkCapabilities(n)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                cm.activeNetworkInfo?.type == ConnectivityManager.TYPE_VPN
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun vpnUiDiagnostics(context: Context): String {
+        val vpnAny = vpnTransportOnAnyNetwork(context.applicationContext)
+        return "transportVpnAnyNet=$vpnAny isVpnTransportActive=${isVpnTransportActive(context)}"
     }
 }
