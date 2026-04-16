@@ -111,9 +111,9 @@ jobs:
             git log -1 --pretty=format:'%B'
             printf '\n---\n\n## CHANGELOG.md\n\n'
             cat "$GITHUB_WORKSPACE/CHANGELOG.md"
-            printf '\n---\n- **SHA:** `%s`\n' "$GITHUB_SHA"
-            printf '- **Short:** `%s`\n' "$SHORT_SHA"
-            printf '- **Workflow:** %s/%s/actions/runs/%s\n' \
+            printf -- '\n---\n- **SHA:** `%s`\n' "$GITHUB_SHA"
+            printf -- '- **Short:** `%s`\n' "$SHORT_SHA"
+            printf -- '- **Workflow:** %s/%s/actions/runs/%s\n' \
               "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
           } > "$GITHUB_WORKSPACE/release_body.md"
 
