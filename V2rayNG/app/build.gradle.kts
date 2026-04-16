@@ -12,8 +12,8 @@ android {
         applicationId = "com.volkvn.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 748
-        versionName = "1.0.5.2-volkvn_fix2_debug"
+        versionCode = 749
+        versionName = "1.0.5.2-volkvn_fix3_debug"
         multiDexEnabled = true
 
         val abiFilterList = (properties["ABI_FILTERS"] as? String)?.split(';')

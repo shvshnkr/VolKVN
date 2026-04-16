@@ -115,10 +115,52 @@ class SimpleMainActivity : HelperBaseActivity() {
 
     override fun onResume() {
         super.onResume()
+        // #region agent log
+        VolkvnAgentDebug.emit(
+            this,
+            hypothesisId = "H9",
+            location = "SimpleMainActivity.kt:onResume",
+            message = "ui_resumed",
+            data = mapOf(
+                "switchChecked" to binding.switchConnect.isChecked,
+                "runningLive" to (mainViewModel.isRunning.value ?: false),
+            ),
+        )
+        // #endregion
         mainViewModel.queryServiceRunningState()
     }
 
+    override fun onPause() {
+        // #region agent log
+        VolkvnAgentDebug.emit(
+            this,
+            hypothesisId = "H9",
+            location = "SimpleMainActivity.kt:onPause",
+            message = "ui_paused",
+            data = mapOf(
+                "switchChecked" to binding.switchConnect.isChecked,
+                "runningLive" to (mainViewModel.isRunning.value ?: false),
+            ),
+        )
+        // #endregion
+        super.onPause()
+    }
+
     private fun onConnectSwitch(isChecked: Boolean) {
+        // #region agent log
+        VolkvnAgentDebug.emit(
+            this,
+            hypothesisId = "H9",
+            location = "SimpleMainActivity.kt:onConnectSwitch",
+            message = "connect_switch_toggled",
+            data = mapOf(
+                "isChecked" to isChecked,
+                "isRunningLive" to (mainViewModel.isRunning.value ?: false),
+                "initialPoolRefreshDone" to initialPoolRefreshDone,
+                "selectedGuidLen" to (MmkvManager.getSelectServer()?.length ?: 0),
+            ),
+        )
+        // #endregion
         if (mainViewModel.isRunning.value == isChecked) return
 
         if (!isChecked) {

@@ -24,6 +24,8 @@ object VolkvnServerSelector {
     private const val FIRST_WAVE = 72
     /** Second wave if the first finds no open port (e.g. mobile blocks most endpoints). */
     private const val SECOND_WAVE = 72
+    /** If too few alive after two waves, probe the rest too (handles pools where many nodes are dead). */
+    private const val MIN_ALIVE_AFTER_TWO_WAVES = 5
     /** Avoid opening too many sockets at once on low-end devices. */
     private const val PARALLEL_PROBES = 20
     /** Re-check the top candidates to avoid bursty/unstable picks. */
@@ -126,6 +128,35 @@ object VolkvnServerSelector {
         out
     }
 
+    suspend fun isServerTcpHealthy(context: Context, guid: String, attempts: Int = 2): Boolean = withContext(Dispatchers.IO) {
+        val row = probeRow(guid)
+        val profile = row?.profile
+        val latency = when {
+            row == null -> Long.MAX_VALUE
+            attempts <= 1 -> row.latency
+            profile == null -> Long.MAX_VALUE
+            else -> stableLatencyMs(profile, attempts)
+        }
+        val healthy = latency < Long.MAX_VALUE
+        // #region agent log
+        VolkvnAgentDebug.emit(
+            context,
+            hypothesisId = "H12",
+            location = "VolkvnServerSelector.kt:isServerTcpHealthy",
+            message = "selected_health_check",
+            data = mapOf(
+                "guidLen" to guid.length,
+                "healthy" to healthy,
+                "latencyMs" to latency,
+                "attempts" to attempts,
+                "host" to (profile?.server ?: ""),
+                "port" to (profile?.serverPort ?: ""),
+            ),
+        )
+        // #endregion
+        healthy
+    }
+
     /**
      * Picks a low-latency server among [subscriptionId] pool:
      * - Shuffles the pool so mobile-reachable nodes are not always missed (previously only the first 48 in list order were tried).
@@ -159,6 +190,26 @@ object VolkvnServerSelector {
             val rest = order.drop(FIRST_WAVE).take(minOf(SECOND_WAVE, order.size - FIRST_WAVE))
             rows = probeGuidsParallel(rest)
             alive = rows.filter { it.latency < Long.MAX_VALUE }.sortedBy { it.latency }
+        }
+        if (alive.size < MIN_ALIVE_AFTER_TWO_WAVES && order.size > FIRST_WAVE + SECOND_WAVE) {
+            val tail = order.drop(FIRST_WAVE + SECOND_WAVE)
+            if (tail.isNotEmpty()) {
+                val tailRows = probeGuidsParallel(tail)
+                val merged = (alive + tailRows.filter { it.latency < Long.MAX_VALUE }).sortedBy { it.latency }
+                alive = merged
+                // #region agent log
+                VolkvnAgentDebug.emit(
+                    context,
+                    hypothesisId = "H13",
+                    location = "VolkvnServerSelector.kt:pickBestServer:tailWave",
+                    message = "expanded_probe_rest_of_pool",
+                    data = mapOf(
+                        "tailSize" to tail.size,
+                        "aliveAfterTail" to alive.size,
+                    ),
+                )
+                // #endregion
+            }
         }
         if (alive.isNotEmpty()) {
             alive = refineTopCandidates(alive)

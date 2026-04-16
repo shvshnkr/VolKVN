@@ -35,13 +35,17 @@ object V2RayServiceManager {
     private const val WATCHDOG_INTERVAL_MS = 4 * 60 * 1000L
     private const val WATCHDOG_INITIAL_DELAY_MS = 90 * 1000L
     private const val WATCHDOG_FAILURE_THRESHOLD = 2
+    private const val WATCHDOG_STARTUP_INTERVAL_MS = 20 * 1000L
+    private const val WATCHDOG_STARTUP_ROUNDS = 3
     private const val NETWORK_HANDOFF_GRACE_MS = 4_000L
     private const val NETWORK_HANDOFF_MIN_INTERVAL_MS = 30_000L
+    private const val NETWORK_HANDOFF_FAILURE_THRESHOLD = 2
 
     private val watchdogScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var watchdogJob: Job? = null
     private var networkRecoveryInProgress = false
     private var lastNetworkHandoffRecoveryAt = 0L
+    private var networkHandoffFailureCount = 0
 
     private val coreController: CoreController = V2RayNativeManager.newCoreController(CoreCallback())
     private val mMsgReceive = ReceiveMessageHandler()
@@ -300,18 +304,49 @@ object V2RayServiceManager {
         watchdogJob = watchdogScope.launch {
             var consecutiveFailures = 0
             delay(WATCHDOG_INITIAL_DELAY_MS)
+            var startupRoundsLeft = WATCHDOG_STARTUP_ROUNDS
             while (isActive) {
                 if (!coreController.isRunning) {
                     delay(10_000)
                     continue
                 }
                 val (ok, detail) = probeCoreHealth()
+                // #region agent log
+                VolkvnAgentDebug.emit(
+                    service,
+                    hypothesisId = "H8",
+                    location = "V2RayServiceManager.kt:startConnectionWatchdog",
+                    message = "watchdog_probe_result",
+                    data = mapOf(
+                        "ok" to ok,
+                        "detail" to detail,
+                        "consecutiveFailuresBeforeUpdate" to consecutiveFailures,
+                        "startupRoundsLeft" to startupRoundsLeft,
+                    ),
+                )
+                // #endregion
                 if (ok) {
                     if (consecutiveFailures > 0) {
                         VolkvnDebugLog.log(service, "Watchdog", "health restored")
                     }
                     consecutiveFailures = 0
                 } else {
+                    val directUp = runCatching { queryStats(AppConfig.TAG_DIRECT, AppConfig.UPLINK) }.getOrDefault(-1L)
+                    val directDown = runCatching { queryStats(AppConfig.TAG_DIRECT, AppConfig.DOWNLINK) }.getOrDefault(-1L)
+                    // #region agent log
+                    VolkvnAgentDebug.emit(
+                        service,
+                        hypothesisId = "H11",
+                        location = "V2RayServiceManager.kt:startConnectionWatchdog",
+                        message = "watchdog_fail_stats_snapshot",
+                        data = mapOf(
+                            "reason" to detail,
+                            "directUp" to directUp,
+                            "directDown" to directDown,
+                            "coreRunning" to coreController.isRunning,
+                        ),
+                    )
+                    // #endregion
                     consecutiveFailures += 1
                     VolkvnDebugLog.log(
                         service,
@@ -331,10 +366,28 @@ object V2RayServiceManager {
                             delay(700)
                             startVService(service)
                         }
+                        // #region agent log
+                        VolkvnAgentDebug.emit(
+                            service,
+                            hypothesisId = "H8",
+                            location = "V2RayServiceManager.kt:startConnectionWatchdog",
+                            message = "watchdog_recover_executed",
+                            data = mapOf(
+                                "reason" to detail,
+                                "startupRoundsLeft" to startupRoundsLeft,
+                            ),
+                        )
+                        // #endregion
                         consecutiveFailures = 0
                     }
                 }
-                delay(WATCHDOG_INTERVAL_MS)
+                val nextDelay = if (startupRoundsLeft > 0) {
+                    startupRoundsLeft -= 1
+                    WATCHDOG_STARTUP_INTERVAL_MS
+                } else {
+                    WATCHDOG_INTERVAL_MS
+                }
+                delay(nextDelay)
             }
         }
     }
@@ -358,13 +411,67 @@ object V2RayServiceManager {
                 delay(NETWORK_HANDOFF_GRACE_MS)
                 val (ok, detail) = probeCoreHealth()
                 if (!ok) {
-                    VolkvnDebugLog.log(service, "Watchdog", "network handoff recover ($reason): $detail")
-                    withContext(Dispatchers.Main) {
-                        stopVService(service)
-                        delay(700)
-                        startVService(service)
+                    networkHandoffFailureCount += 1
+                    val directUp = runCatching { queryStats(AppConfig.TAG_DIRECT, AppConfig.UPLINK) }.getOrDefault(-1L)
+                    val directDown = runCatching { queryStats(AppConfig.TAG_DIRECT, AppConfig.DOWNLINK) }.getOrDefault(-1L)
+                    // #region agent log
+                    VolkvnAgentDebug.emit(
+                        service,
+                        hypothesisId = "H10",
+                        location = "V2RayServiceManager.kt:onUnderlyingNetworkChanged",
+                        message = "handoff_probe_failed",
+                        data = mapOf(
+                            "reason" to reason,
+                            "detail" to detail,
+                            "failureCount" to networkHandoffFailureCount,
+                            "threshold" to NETWORK_HANDOFF_FAILURE_THRESHOLD,
+                            "directUp" to directUp,
+                            "directDown" to directDown,
+                        ),
+                    )
+                    // #endregion
+                    if (networkHandoffFailureCount >= NETWORK_HANDOFF_FAILURE_THRESHOLD) {
+                        val failedGuid = MmkvManager.getSelectServer()
+                        val targetSubId = currentConfig?.subscriptionId ?: AppConfig.VOLKVN_SUBSCRIPTION_ID
+                        VolkvnServerSelector.markServerUnhealthy(failedGuid, "handoff:$reason:$detail")
+                        runCatching {
+                            VolkvnServerSelector.pickBestServer(service, targetSubId)
+                        }
+                        // #region agent log
+                        VolkvnAgentDebug.emit(
+                            service,
+                            hypothesisId = "H14",
+                            location = "V2RayServiceManager.kt:onUnderlyingNetworkChanged",
+                            message = "handoff_reselect_before_restart",
+                            data = mapOf(
+                                "failedGuidLen" to (failedGuid?.length ?: 0),
+                                "targetSubId" to targetSubId,
+                                "newGuidLen" to (MmkvManager.getSelectServer()?.length ?: 0),
+                            ),
+                        )
+                        // #endregion
+                        VolkvnDebugLog.log(
+                            service,
+                            "Watchdog",
+                            "network handoff recover ($reason): $detail [count=$networkHandoffFailureCount]",
+                        )
+                        withContext(Dispatchers.Main) {
+                            stopVService(service)
+                            delay(700)
+                            startVService(service)
+                        }
+                        networkHandoffFailureCount = 0
+                    } else {
+                        VolkvnDebugLog.log(
+                            service,
+                            "Watchdog",
+                            "network handoff probe failed ($reason): $detail [count=$networkHandoffFailureCount]",
+                        )
                     }
                 } else {
+                    if (networkHandoffFailureCount != 0) {
+                        networkHandoffFailureCount = 0
+                    }
                     VolkvnDebugLog.log(service, "Watchdog", "network handoff healthy ($reason): $detail")
                 }
             } finally {
@@ -374,18 +481,93 @@ object V2RayServiceManager {
     }
 
     private fun probeCoreHealth(): Pair<Boolean, String> {
-        return runCatching {
-            val primary = coreController.measureDelay(SettingsManager.getDelayTestUrl())
-            if (primary >= 0) return true to "ok($primary)"
-            val fallback = coreController.measureDelay(SettingsManager.getDelayTestUrl(true))
-            if (fallback >= 0) {
-                true to "ok-fallback($fallback)"
-            } else {
-                false to "delay=-1"
-            }
-        }.getOrElse { e ->
-            false to (e.message ?: e.javaClass.simpleName)
+        val service = getService()
+        val primaryUrl = SettingsManager.getDelayTestUrl()
+        val fallbackUrl = SettingsManager.getDelayTestUrl(true)
+        // #region agent log
+        service?.let {
+            VolkvnAgentDebug.emit(
+                it,
+                hypothesisId = "H6",
+                location = "V2RayServiceManager.kt:probeCoreHealth:entry",
+                message = "probe_urls",
+                data = mapOf(
+                    "primaryUrl" to primaryUrl,
+                    "fallbackUrl" to fallbackUrl,
+                    "coreRunning" to coreController.isRunning,
+                ),
+            )
         }
+        // #endregion
+        var primaryError: String? = null
+        val primary = try {
+            coreController.measureDelay(primaryUrl)
+        } catch (e: Exception) {
+            primaryError = e.message ?: e.javaClass.simpleName
+            // #region agent log
+            service?.let {
+                VolkvnAgentDebug.emit(
+                    it,
+                    hypothesisId = "H6",
+                    location = "V2RayServiceManager.kt:probeCoreHealth:primary",
+                    message = "primary_exception",
+                    data = mapOf(
+                        "error" to primaryError,
+                        "errorClass" to e.javaClass.simpleName,
+                    ),
+                )
+            }
+            // #endregion
+            -1L
+        }
+        // #region agent log
+        service?.let {
+            VolkvnAgentDebug.emit(
+                it,
+                hypothesisId = "H6",
+                location = "V2RayServiceManager.kt:probeCoreHealth:primary",
+                message = "primary_result",
+                data = mapOf("delayMs" to primary),
+            )
+        }
+        // #endregion
+        if (primary >= 0) return true to "ok($primary)"
+
+        var fallbackError: String? = null
+        val fallback = try {
+            coreController.measureDelay(fallbackUrl)
+        } catch (e: Exception) {
+            fallbackError = e.message ?: e.javaClass.simpleName
+            // #region agent log
+            service?.let {
+                VolkvnAgentDebug.emit(
+                    it,
+                    hypothesisId = "H6",
+                    location = "V2RayServiceManager.kt:probeCoreHealth:fallback",
+                    message = "fallback_exception",
+                    data = mapOf(
+                        "error" to fallbackError,
+                        "errorClass" to e.javaClass.simpleName,
+                    ),
+                )
+            }
+            // #endregion
+            -1L
+        }
+        // #region agent log
+        service?.let {
+            VolkvnAgentDebug.emit(
+                it,
+                hypothesisId = "H6",
+                location = "V2RayServiceManager.kt:probeCoreHealth:fallback",
+                message = "fallback_result",
+                data = mapOf("delayMs" to fallback),
+            )
+        }
+        // #endregion
+        if (fallback >= 0) return true to "ok-fallback($fallback)"
+        val detail = listOfNotNull(primaryError, fallbackError).joinToString(" | ").ifBlank { "delay=-1" }
+        return false to detail
     }
 
     /**
@@ -412,19 +594,75 @@ object V2RayServiceManager {
             val service = getService() ?: return@launch
             var time = -1L
             var errorStr = ""
+            val primaryUrl = SettingsManager.getDelayTestUrl()
+            val fallbackUrl = SettingsManager.getDelayTestUrl(true)
+            // #region agent log
+            VolkvnAgentDebug.emit(
+                service,
+                hypothesisId = "H7",
+                location = "V2RayServiceManager.kt:measureV2rayDelay:entry",
+                message = "manual_check_urls",
+                data = mapOf(
+                    "primaryUrl" to primaryUrl,
+                    "fallbackUrl" to fallbackUrl,
+                ),
+            )
+            // #endregion
 
             try {
-                time = coreController.measureDelay(SettingsManager.getDelayTestUrl())
+                time = coreController.measureDelay(primaryUrl)
+                // #region agent log
+                VolkvnAgentDebug.emit(
+                    service,
+                    hypothesisId = "H7",
+                    location = "V2RayServiceManager.kt:measureV2rayDelay:primary",
+                    message = "manual_primary_result",
+                    data = mapOf("delayMs" to time),
+                )
+                // #endregion
             } catch (e: Exception) {
                 Log.e(AppConfig.TAG, "StartCore-Manager: Failed to measure delay", e)
                 errorStr = e.message?.substringAfter("\":") ?: "empty message"
+                // #region agent log
+                VolkvnAgentDebug.emit(
+                    service,
+                    hypothesisId = "H7",
+                    location = "V2RayServiceManager.kt:measureV2rayDelay:primary",
+                    message = "manual_primary_exception",
+                    data = mapOf(
+                        "error" to (e.message ?: e.javaClass.simpleName),
+                        "errorClass" to e.javaClass.simpleName,
+                    ),
+                )
+                // #endregion
             }
             if (time == -1L) {
                 try {
-                    time = coreController.measureDelay(SettingsManager.getDelayTestUrl(true))
+                    time = coreController.measureDelay(fallbackUrl)
+                    // #region agent log
+                    VolkvnAgentDebug.emit(
+                        service,
+                        hypothesisId = "H7",
+                        location = "V2RayServiceManager.kt:measureV2rayDelay:fallback",
+                        message = "manual_fallback_result",
+                        data = mapOf("delayMs" to time),
+                    )
+                    // #endregion
                 } catch (e: Exception) {
                     Log.e(AppConfig.TAG, "StartCore-Manager: Failed to measure delay", e)
                     errorStr = e.message?.substringAfter("\":") ?: "empty message"
+                    // #region agent log
+                    VolkvnAgentDebug.emit(
+                        service,
+                        hypothesisId = "H7",
+                        location = "V2RayServiceManager.kt:measureV2rayDelay:fallback",
+                        message = "manual_fallback_exception",
+                        data = mapOf(
+                            "error" to (e.message ?: e.javaClass.simpleName),
+                            "errorClass" to e.javaClass.simpleName,
+                        ),
+                    )
+                    // #endregion
                 }
             }
 

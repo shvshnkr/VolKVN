@@ -1,6 +1,21 @@
 # Changelog
 
-Здесь фиксируются изменения форка VolKVN. На GitHub в описание релиза попадает **полное сообщение коммита**, который запустил сборку, и **этот файл** — чтобы суть совпадала с коммитом и была удобна для чтения.
+## [1.0.5.2-volkvn_fix3_debug] - versionCode 749
+
+### Fixed
+
+- Auto-recovery after network handoff/sleep: fallback health-check in `probeCoreHealth` now runs even when primary URL throws an exception.
+- Health-check fallback URL changed to `https://cp.cloudflare.com/generate_204` for networks where Google endpoints are unstable.
+- `onUnderlyingNetworkChanged`: recovery now requires 2 consecutive probe failures to avoid unnecessary stop/start on single flaps.
+- During handoff-recover, current server is marked unhealthy and reselected before restart to avoid rebooting into the same dead node.
+- Auto-select with `vpnUp=false`: selected server health is checked before `keep selection`; dead selection triggers forced re-pick.
+- Selector now expands probing to the rest of the pool (tail wave) when too few alive nodes are found in first waves.
+
+### Diagnostics
+
+- Expanded AGENT logs (`H6-H14`) for runtime analysis of manual checks, watchdog/handoff, and server selection.
+
+---
 
 ## [1.0.5.2-volkvn_fix2_debug] — versionCode 748
 

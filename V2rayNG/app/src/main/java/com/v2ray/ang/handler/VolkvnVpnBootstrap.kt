@@ -95,7 +95,10 @@ object VolkvnVpnBootstrap {
             val selected = MmkvManager.getSelectServer()
             val guids = MmkvManager.decodeServerList(subId)
             val vpnUp = Utils.isVpnTransportActive(context.applicationContext)
-            val needPick = selected.isNullOrBlank() || selected !in guids
+            val selectedInPool = selected != null && selected in guids
+            val selectedHealthyWhenDown =
+                if (!vpnUp && selectedInPool) VolkvnServerSelector.isServerTcpHealthy(context, selected, attempts = 2) else true
+            val needPick = selected.isNullOrBlank() || !selectedInPool || !selectedHealthyWhenDown
             // #region agent log
             VolkvnAgentDebug.emit(
                 context,
@@ -106,18 +109,22 @@ object VolkvnVpnBootstrap {
                     "importCount" to count,
                     "guidsSize" to guids.size,
                     "selectedPresent" to !selected.isNullOrBlank(),
-                    "selectedInPool" to (selected != null && selected in guids),
+                    "selectedInPool" to selectedInPool,
                     "vpnUp" to vpnUp,
+                    "selectedHealthyWhenDown" to selectedHealthyWhenDown,
                     "needPick" to needPick,
                 ),
             )
             // #endregion
             if (needPick) {
+                if (!selected.isNullOrBlank() && selectedInPool && !selectedHealthyWhenDown) {
+                    VolkvnServerSelector.markServerUnhealthy(selected, "refresh:selected_failed_tcp_health")
+                }
                 VolkvnServerSelector.pickBestServer(context, subId)
                 VolkvnDebugLog.log(
                     context,
                     TAG,
-                    "refresh: pickBestServer (vpnUp=$vpnUp blank=${selected.isNullOrBlank()} missing=${selected != null && selected !in guids})",
+                    "refresh: pickBestServer (vpnUp=$vpnUp blank=${selected.isNullOrBlank()} missing=${!selectedInPool} selectedHealthyWhenDown=$selectedHealthyWhenDown)",
                 )
                 // #region agent log
                 VolkvnAgentDebug.emit(
