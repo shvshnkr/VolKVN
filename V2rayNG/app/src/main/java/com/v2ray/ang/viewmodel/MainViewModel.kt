@@ -119,7 +119,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         else -> AppConfig.VOLKVN_SUBSCRIPTION_ID
                     }
                 VolkvnServerSelector.markServerUnhealthy(selectedGuid, "autoRecover:$reason")
-                VolkvnServerSelector.pickBestServer(targetSubId)
+                VolkvnServerSelector.pickBestServer(app, targetSubId)
                 withContext(Dispatchers.Main) {
                     V2RayServiceManager.stopVService(app)
                     delay(450)

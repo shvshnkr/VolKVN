@@ -10,13 +10,15 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** File log in cache for sharing (VolKVN). */
+/** File log in cache for sharing (VolKVN). Hard-capped so cache cannot grow without bound. */
 object VolkvnDebugLog {
 
     private const val TAG = "VolkvnDebugLog"
     const val FILE_NAME = "volkvn_debug.txt"
-    private const val MAX_BYTES = 512_000
-    private const val KEEP_AFTER_TRIM = 400_000
+    /** Max on-disk size (1 MiB: enough for long sessions; 10 MiB is unnecessary on device). */
+    private const val MAX_BYTES = 1 shl 20
+    /** After trim, keep this many bytes from the end (below [MAX_BYTES] so the next writes fit). */
+    private const val KEEP_AFTER_TRIM = 786_432
     private const val MAX_EXPORT_COPIES = 18
     private val lock = Any()
     private val tsFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
@@ -37,6 +39,9 @@ object VolkvnDebugLog {
                     trimTail(f)
                 }
                 f.appendText(line, Charsets.UTF_8)
+                while (f.exists() && f.length() > MAX_BYTES) {
+                    trimTail(f)
+                }
             } catch (e: Exception) {
                 Log.w(TAG, "write failed", e)
             }

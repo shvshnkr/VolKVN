@@ -100,10 +100,20 @@ jobs:
       - name: Prepare release metadata
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
+          set -e
           SHORT_SHA="${GITHUB_SHA::7}"
           TAG="auto-${GITHUB_RUN_NUMBER}-${SHORT_SHA}"
           echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
-          echo "RELEASE_NAME=Auto build #${GITHUB_RUN_NUMBER} (${SHORT_SHA})" >> "$GITHUB_ENV"
+          COMMIT_TITLE="$(git log -1 --pretty=%s)"
+          echo "RELEASE_NAME=${COMMIT_TITLE} (#${GITHUB_RUN_NUMBER})" >> "$GITHUB_ENV"
+          {
+            printf '%s\n\n' "## Changelog (latest commit on main)"
+            git log -1 --pretty=format:'%B'
+            printf '\n---\n- **SHA:** `%s`\n' "$GITHUB_SHA"
+            printf '- **Short:** `%s`\n' "$SHORT_SHA"
+            printf '- **Workflow:** %s/%s/actions/runs/%s\n' \
+              "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+          } > "$GITHUB_WORKSPACE/release_body.md"
 
       - name: Publish GitHub Release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -113,8 +123,6 @@ jobs:
           name: ${{ env.RELEASE_NAME }}
           make_latest: true
           generate_release_notes: false
-          body: |
-            Automatic build from `main`.
-            Commit: `${{ github.sha }}`
+          body_path: release_body.md
           files: |
             V2rayNG/app/build/outputs/apk/playstore/debug/*.apk

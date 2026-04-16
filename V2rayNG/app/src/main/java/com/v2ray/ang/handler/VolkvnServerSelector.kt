@@ -1,5 +1,6 @@
 package com.v2ray.ang.handler
 
+import android.content.Context
 import android.os.SystemClock
 import android.util.Log
 import com.v2ray.ang.dto.ProfileItem
@@ -131,12 +132,25 @@ object VolkvnServerSelector {
      * - Two waves of TCP probes if the first wave finds nothing reachable.
      * - If no TCP success at all, selects a **random** profile (never the stale “first in MMKV list”).
      */
-    suspend fun pickBestServer(subscriptionId: String) {
+    suspend fun pickBestServer(context: Context, subscriptionId: String) {
         val guids = MmkvManager.decodeServerList(subscriptionId)
         if (guids.isEmpty()) return
 
         val eligible = guids.filterNot { isServerOnCooldown(it) }
         val pool = if (eligible.isNotEmpty()) eligible else guids
+        // #region agent log
+        VolkvnAgentDebug.emit(
+            context,
+            hypothesisId = "H3",
+            location = "VolkvnServerSelector.kt:pickBestServer:entry",
+            message = "pool_sizes",
+            data = mapOf(
+                "guidsTotal" to guids.size,
+                "eligibleNotCooldown" to eligible.size,
+                "usingEligiblePool" to (eligible.isNotEmpty()),
+            ),
+        )
+        // #endregion
         val order = pool.shuffled()
         var rows = probeGuidsParallel(order.take(minOf(FIRST_WAVE, order.size)))
         var alive = rows.filter { it.latency < Long.MAX_VALUE }.sortedBy { it.latency }
@@ -149,6 +163,26 @@ object VolkvnServerSelector {
         if (alive.isNotEmpty()) {
             alive = refineTopCandidates(alive)
         }
+        // #region agent log
+        val top3 = alive.take(3).map { r ->
+            mapOf(
+                "lat" to r.latency,
+                "host" to (r.profile.server ?: ""),
+                "port" to (r.profile.serverPort ?: ""),
+            )
+        }
+        VolkvnAgentDebug.emit(
+            context,
+            hypothesisId = "H1",
+            location = "VolkvnServerSelector.kt:pickBestServer:afterProbes",
+            message = "probe_summary",
+            data = mapOf(
+                "aliveCount" to alive.size,
+                "firstWaveSize" to minOf(FIRST_WAVE, order.size),
+                "top3" to top3.toString(),
+            ),
+        )
+        // #endregion
 
         val pick = when {
             alive.isEmpty() -> {
@@ -171,6 +205,22 @@ object VolkvnServerSelector {
             "Selected ${pick.profile.remarks} (${pick.profile.server}:${pick.profile.serverPort}) " +
                 "latency=${if (pick.latency < Long.MAX_VALUE) "${pick.latency}ms" else "n/a (fallback)"}",
         )
+        // #region agent log
+        VolkvnAgentDebug.emit(
+            context,
+            hypothesisId = "H1",
+            location = "VolkvnServerSelector.kt:pickBestServer:chosen",
+            message = "final_pick",
+            data = mapOf(
+                "guidLen" to pick.guid.length,
+                "latencyMs" to pick.latency,
+                "configType" to pick.profile.configType.name,
+                "host" to (pick.profile.server ?: ""),
+                "port" to (pick.profile.serverPort ?: ""),
+                "fallbackRandom" to (alive.isEmpty()),
+            ),
+        )
+        // #endregion
     }
 
     private fun <T> List<T>.random(): T = this[Random.nextInt(size)]

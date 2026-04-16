@@ -16,6 +16,7 @@ import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivitySimpleMainBinding
 import com.v2ray.ang.enums.PermissionType
 import com.v2ray.ang.extension.toast
+import com.v2ray.ang.handler.VolkvnAgentDebug
 import com.v2ray.ang.handler.VolkvnDebugLog
 import com.v2ray.ang.handler.VolkvnVpnBootstrap
 import com.v2ray.ang.handler.MmkvManager
@@ -167,6 +168,18 @@ class SimpleMainActivity : HelperBaseActivity() {
                 preconnectRefreshInProgress = true
                 binding.tvStatus.text = getString(R.string.volkvn_simple_status_refreshing)
                 VolkvnDebugLog.log(this@SimpleMainActivity, "SimpleMain", "preconnect refresh: start")
+                // #region agent log
+                VolkvnAgentDebug.emit(
+                    this@SimpleMainActivity,
+                    hypothesisId = "H5",
+                    location = "SimpleMainActivity.kt:startV2RayWithPreflight",
+                    message = "before_preconnect_refresh",
+                    data = mapOf(
+                        "selectedGuidLen" to (MmkvManager.getSelectServer()?.length ?: 0),
+                        "needRefresh" to needRefresh,
+                    ),
+                )
+                // #endregion
                 runCatching {
                     VolkvnVpnBootstrap.refreshServersAndSelectBest(this@SimpleMainActivity)
                 }.onFailure {
@@ -179,6 +192,18 @@ class SimpleMainActivity : HelperBaseActivity() {
                 lastPreconnectRefreshAt = now
                 preconnectRefreshInProgress = false
             }
+            // #region agent log
+            VolkvnAgentDebug.emit(
+                this@SimpleMainActivity,
+                hypothesisId = "H5",
+                location = "SimpleMainActivity.kt:beforeStartVService",
+                message = "about_to_start_vservice",
+                data = mapOf(
+                    "selectedGuidLen" to (MmkvManager.getSelectServer()?.length ?: 0),
+                    "skippedRefreshDueToInterval" to !needRefresh,
+                ),
+            )
+            // #endregion
             V2RayServiceManager.startVService(this@SimpleMainActivity)
         }
     }

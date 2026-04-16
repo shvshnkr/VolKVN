@@ -324,7 +324,7 @@ object V2RayServiceManager {
                         VolkvnDebugLog.log(service, "Watchdog", "auto-recover: reselect + restart (reason=$detail)")
                         VolkvnServerSelector.markServerUnhealthy(failedGuid, "watchdog:$detail")
                         runCatching {
-                            VolkvnServerSelector.pickBestServer(targetSubId)
+                            VolkvnServerSelector.pickBestServer(service, targetSubId)
                         }
                         withContext(Dispatchers.Main) {
                             stopVService(service)

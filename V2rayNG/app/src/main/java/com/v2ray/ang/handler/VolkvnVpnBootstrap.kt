@@ -29,17 +29,43 @@ object VolkvnVpnBootstrap {
     /**
      * One-shot refresh used from UI and worker.
      * - Debounced a few seconds to avoid duplicate imports from tight UI + worker scheduling.
-     * - If VPN is **up** and the selected profile is still in the pool, do not [pickBestServer] (avoids
-     *   MMKV/core mismatch while the core keeps the old config).
-     * - If VPN is **down**, always [pickBestServer] after import so the chosen node is TCP-probed
-     *   (avoids «no connect» from keeping a dead profile that merely survived import matching).
+     * - If the selected profile is still in the pool after import, do not [pickBestServer] (avoids
+     *   MMKV/core mismatch while the core keeps the old config, and avoids re-picking on every refresh
+     *   while VPN is down — that used to reshuffle [VolkvnServerSelector] and replace a decent node
+     *   with a worse TCP-only probe right before connect).
+     * - [pickBestServer] runs when selection is blank or no longer in the imported pool; dead nodes
+     *   are still handled via [VolkvnServerSelector.markServerUnhealthy], watchdog, and auto-recover.
      */
     suspend fun refreshServersAndSelectBest(context: Context) = refreshMutex.withLock {
         withContext(Dispatchers.IO) {
             val nowWall = System.currentTimeMillis()
             val lastWall = MmkvManager.decodeSettingsLong(AppConfig.PREF_VOLKVN_LAST_POOL_REFRESH_AT, 0L)
+            val deltaMs = if (lastWall > 0L) nowWall - lastWall else -1L
+            // #region agent log
+            VolkvnAgentDebug.emit(
+                context,
+                hypothesisId = "H2",
+                location = "VolkvnVpnBootstrap.kt:refreshServersAndSelectBest",
+                message = "refresh_enter",
+                data = mapOf(
+                    "lastWall" to lastWall,
+                    "nowWall" to nowWall,
+                    "deltaMs" to deltaMs,
+                    "willSkipDebounce" to (lastWall > 0L && nowWall - lastWall < 4000L),
+                ),
+            )
+            // #endregion
             if (lastWall > 0L && nowWall - lastWall < 4000L) {
                 VolkvnDebugLog.log(context, TAG, "refresh: skip debounce ${nowWall - lastWall}ms")
+                // #region agent log
+                VolkvnAgentDebug.emit(
+                    context,
+                    hypothesisId = "H2",
+                    location = "VolkvnVpnBootstrap.kt:skipDebounce",
+                    message = "refresh_skipped_no_import_no_pick",
+                    data = mapOf("deltaMs" to (nowWall - lastWall)),
+                )
+                // #endregion
                 return@withContext
             }
 
@@ -69,14 +95,41 @@ object VolkvnVpnBootstrap {
             val selected = MmkvManager.getSelectServer()
             val guids = MmkvManager.decodeServerList(subId)
             val vpnUp = Utils.isVpnTransportActive(context.applicationContext)
-            val needPick = selected.isNullOrBlank() || selected !in guids || !vpnUp
+            val needPick = selected.isNullOrBlank() || selected !in guids
+            // #region agent log
+            VolkvnAgentDebug.emit(
+                context,
+                hypothesisId = "H5",
+                location = "VolkvnVpnBootstrap.kt:afterImport",
+                message = "needPick_decision",
+                data = mapOf(
+                    "importCount" to count,
+                    "guidsSize" to guids.size,
+                    "selectedPresent" to !selected.isNullOrBlank(),
+                    "selectedInPool" to (selected != null && selected in guids),
+                    "vpnUp" to vpnUp,
+                    "needPick" to needPick,
+                ),
+            )
+            // #endregion
             if (needPick) {
-                VolkvnServerSelector.pickBestServer(subId)
+                VolkvnServerSelector.pickBestServer(context, subId)
                 VolkvnDebugLog.log(
                     context,
                     TAG,
-                    "refresh: pickBestServer (vpnUp=$vpnUp needPick reasons: blank=${selected.isNullOrBlank()} missing=${selected != null && selected !in guids})",
+                    "refresh: pickBestServer (vpnUp=$vpnUp blank=${selected.isNullOrBlank()} missing=${selected != null && selected !in guids})",
                 )
+                // #region agent log
+                VolkvnAgentDebug.emit(
+                    context,
+                    hypothesisId = "H5",
+                    location = "VolkvnVpnBootstrap.kt:afterPickBest",
+                    message = "selected_after_pick",
+                    data = mapOf(
+                        "guid" to (MmkvManager.getSelectServer() ?: ""),
+                    ),
+                )
+                // #endregion
             } else {
                 VolkvnDebugLog.log(context, TAG, "refresh: keep selection guid=$selected (${guids.size} in pool)")
             }
