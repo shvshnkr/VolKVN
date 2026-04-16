@@ -25,6 +25,8 @@ import com.v2ray.ang.handler.V2rayConfigManager
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.NotificationManager
 import com.v2ray.ang.handler.SettingsManager
+import com.v2ray.ang.handler.VolkvnAgentDebug
+import com.v2ray.ang.handler.VolkvnDebugLog
 import com.v2ray.ang.handler.V2RayServiceManager
 import com.v2ray.ang.util.MyContextWrapper
 import com.v2ray.ang.util.Utils
@@ -323,6 +325,25 @@ class V2RayVpnService : VpnService(), ServiceControl {
                 Log.e(AppConfig.TAG, "StartCore-VPN: Failed to configure app", e)
             }
         }
+        // #region agent log
+        val pkgs = apps.sorted().joinToString(",")
+        VolkvnDebugLog.log(
+            this,
+            "V2RayVpnService",
+            "configurePerAppProxy bypass=$bypassApps packages=${apps.size}: $pkgs",
+        )
+        VolkvnAgentDebug.emit(
+            this,
+            hypothesisId = "H4",
+            location = "V2RayVpnService.kt:configurePerAppProxy",
+            message = "vpn_app_filter",
+            data = mapOf(
+                "bypassMode" to bypassApps,
+                "count" to apps.size,
+                "packages" to pkgs,
+            ),
+        )
+        // #endregion
     }
 
     /**

@@ -107,8 +107,10 @@ jobs:
           COMMIT_TITLE="$(git log -1 --pretty=%s)"
           echo "RELEASE_NAME=${COMMIT_TITLE} (#${GITHUB_RUN_NUMBER})" >> "$GITHUB_ENV"
           {
-            printf '%s\n\n' "## Changelog (latest commit on main)"
+            printf '%s\n\n' "## Commit (full message)"
             git log -1 --pretty=format:'%B'
+            printf '\n---\n\n## CHANGELOG.md\n\n'
+            cat "$GITHUB_WORKSPACE/CHANGELOG.md"
             printf '\n---\n- **SHA:** `%s`\n' "$GITHUB_SHA"
             printf '- **Short:** `%s`\n' "$SHORT_SHA"
             printf '- **Workflow:** %s/%s/actions/runs/%s\n' \
