@@ -294,21 +294,38 @@ class V2RayVpnService : VpnService(), ServiceControl {
      */
     private fun configurePerAppProxy(builder: Builder) {
         val selfPackageName = BuildConfig.APPLICATION_ID
+        val apps = MmkvManager.decodeSettingsStringSet(AppConfig.PREF_PER_APP_PROXY_SET) ?: mutableSetOf()
+        val perAppEnabled = MmkvManager.decodeSettingsBool(AppConfig.PREF_PER_APP_PROXY) != false
+        val bypassApps = MmkvManager.decodeSettingsBool(AppConfig.PREF_BYPASS_APPS)
+        // #region agent log
+        VolkvnAgentDebug.emit(
+            this,
+            hypothesisId = "H18",
+            location = "V2RayVpnService.kt:configurePerAppProxy",
+            message = "per_app_mode_resolved",
+            data = mapOf(
+                "perAppEnabled" to perAppEnabled,
+                "bypassApps" to bypassApps,
+                "initialCount" to apps.size,
+                "selfPackage" to selfPackageName,
+                "selfInSetBeforeAdjust" to apps.contains(selfPackageName),
+                "sdkInt" to Build.VERSION.SDK_INT,
+            ),
+        )
+        // #endregion
 
         // If per-app proxy is not enabled, disallow the VPN service's own package and return
-        if (MmkvManager.decodeSettingsBool(AppConfig.PREF_PER_APP_PROXY) == false) {
+        if (!perAppEnabled) {
             builder.addDisallowedApplication(selfPackageName)
             return
         }
 
         // If no apps are selected, disallow the VPN service's own package and return
-        val apps = MmkvManager.decodeSettingsStringSet(AppConfig.PREF_PER_APP_PROXY_SET)
         if (apps.isNullOrEmpty()) {
             builder.addDisallowedApplication(selfPackageName)
             return
         }
 
-        val bypassApps = MmkvManager.decodeSettingsBool(AppConfig.PREF_BYPASS_APPS)
         // Handle the VPN service's own package according to the mode
         if (bypassApps) apps.add(selfPackageName) else apps.remove(selfPackageName)
 
@@ -341,6 +358,18 @@ class V2RayVpnService : VpnService(), ServiceControl {
                 "bypassMode" to bypassApps,
                 "count" to apps.size,
                 "packages" to pkgs,
+            ),
+        )
+        VolkvnAgentDebug.emit(
+            this,
+            hypothesisId = "H19",
+            location = "V2RayVpnService.kt:configurePerAppProxy",
+            message = "builder_rules_applied",
+            data = mapOf(
+                "mode" to if (bypassApps) "disallowlist" else "allowlist",
+                "count" to apps.size,
+                "containsSelfAfterAdjust" to apps.contains(selfPackageName),
+                "containsTermux" to apps.any { it.contains("termux") },
             ),
         )
         // #endregion

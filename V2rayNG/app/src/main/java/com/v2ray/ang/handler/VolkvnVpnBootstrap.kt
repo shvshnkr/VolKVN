@@ -15,6 +15,7 @@ import com.v2ray.ang.R
 import com.v2ray.ang.dto.SubscriptionItem
 import com.v2ray.ang.util.HttpUtil
 import com.v2ray.ang.util.Utils
+import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -25,6 +26,49 @@ object VolkvnVpnBootstrap {
 
     private const val TAG = "VolkvnVpnBootstrap"
     private val refreshMutex = Mutex()
+
+    private fun checkSelectedRealHealthy(context: Context, guid: String, hypothesisId: String): Boolean {
+        val speedConfig = V2rayConfigManager.getV2rayConfig4Speedtest(context, guid)
+        val profile = MmkvManager.decodeServerConfig(guid)
+        val host = profile?.server.orEmpty()
+        val port = profile?.serverPort.orEmpty()
+        if (!speedConfig.status) {
+            // #region agent log
+            VolkvnAgentDebug.emit(
+                context,
+                hypothesisId = hypothesisId,
+                location = "VolkvnVpnBootstrap.kt:realPingCheck",
+                message = "selected_real_ping_config_failed",
+                data = mapOf("guidLen" to guid.length),
+            )
+            // #endregion
+            return false
+        }
+        val primary = V2RayNativeManager.measureOutboundDelay(speedConfig.content, SettingsManager.getDelayTestUrl())
+        val fallback = if (primary >= 0) primary else V2RayNativeManager.measureOutboundDelay(
+            speedConfig.content,
+            SettingsManager.getDelayTestUrl(true),
+        )
+        val delay = max(primary, fallback)
+        // #region agent log
+        VolkvnAgentDebug.emit(
+            context,
+            hypothesisId = hypothesisId,
+            location = "VolkvnVpnBootstrap.kt:realPingCheck",
+            message = "selected_real_ping_check",
+            data = mapOf(
+                "guid" to guid,
+                "host" to host,
+                "port" to port,
+                "guidLen" to guid.length,
+                "primaryDelayMs" to primary,
+                "fallbackDelayMs" to fallback,
+                "realHealthy" to (delay >= 0),
+            ),
+        )
+        // #endregion
+        return delay >= 0
+    }
 
     /**
      * One-shot refresh used from UI and worker.
@@ -92,13 +136,30 @@ object VolkvnVpnBootstrap {
             MmkvManager.encodeSettings(AppConfig.PREF_VOLKVN_LAST_POOL_REFRESH_AT, System.currentTimeMillis())
 
             val subId = AppConfig.VOLKVN_SUBSCRIPTION_ID
+            // Pool re-import replaces serverList order; restore ping order using stored test results.
+            MmkvManager.sortServerListByTestDelay(subId)
+            // #region agent log
+            VolkvnAgentDebug.emit(
+                context,
+                hypothesisId = "H33",
+                location = "VolkvnVpnBootstrap.kt:afterPoolImport",
+                message = "pool_list_resorted_by_stored_ping",
+                data = mapOf("subId" to subId),
+            )
+            // #endregion
             val selected = MmkvManager.getSelectServer()
             val guids = MmkvManager.decodeServerList(subId)
             val vpnUp = Utils.isVpnTransportActive(context.applicationContext)
             val selectedInPool = selected != null && selected in guids
             val selectedHealthyWhenDown =
                 if (!vpnUp && selectedInPool) VolkvnServerSelector.isServerTcpHealthy(context, selected, attempts = 2) else true
-            val needPick = selected.isNullOrBlank() || !selectedInPool || !selectedHealthyWhenDown
+            val selectedRealHealthyWhenDown =
+                if (!vpnUp && selectedInPool && selectedHealthyWhenDown) {
+                    checkSelectedRealHealthy(context, selected, "H17")
+                } else {
+                    true
+                }
+            val needPick = selected.isNullOrBlank() || !selectedInPool || !selectedHealthyWhenDown || !selectedRealHealthyWhenDown
             // #region agent log
             VolkvnAgentDebug.emit(
                 context,
@@ -112,19 +173,43 @@ object VolkvnVpnBootstrap {
                     "selectedInPool" to selectedInPool,
                     "vpnUp" to vpnUp,
                     "selectedHealthyWhenDown" to selectedHealthyWhenDown,
+                    "selectedRealHealthyWhenDown" to selectedRealHealthyWhenDown,
                     "needPick" to needPick,
                 ),
             )
             // #endregion
             if (needPick) {
-                if (!selected.isNullOrBlank() && selectedInPool && !selectedHealthyWhenDown) {
-                    VolkvnServerSelector.markServerUnhealthy(selected, "refresh:selected_failed_tcp_health")
+                if (!selected.isNullOrBlank() && selectedInPool && (!selectedHealthyWhenDown || !selectedRealHealthyWhenDown)) {
+                    VolkvnServerSelector.markServerUnhealthy(
+                        selected,
+                        "refresh:selected_failed_health tcp=$selectedHealthyWhenDown real=$selectedRealHealthyWhenDown",
+                    )
                 }
                 VolkvnServerSelector.pickBestServer(context, subId)
+                val picked = MmkvManager.getSelectServer()
+                if (!vpnUp && !picked.isNullOrBlank()) {
+                    val pickedRealHealthy = checkSelectedRealHealthy(context, picked, "H21")
+                    if (!pickedRealHealthy) {
+                        VolkvnServerSelector.markServerUnhealthy(picked, "refresh:post_pick_real_ping_failed")
+                        VolkvnServerSelector.pickBestServer(context, subId)
+                        // #region agent log
+                        VolkvnAgentDebug.emit(
+                            context,
+                            hypothesisId = "H21",
+                            location = "VolkvnVpnBootstrap.kt:afterPickBest",
+                            message = "repick_after_failed_real_ping",
+                            data = mapOf(
+                                "firstPickGuidLen" to picked.length,
+                                "finalPickGuidLen" to (MmkvManager.getSelectServer()?.length ?: 0),
+                            ),
+                        )
+                        // #endregion
+                    }
+                }
                 VolkvnDebugLog.log(
                     context,
                     TAG,
-                    "refresh: pickBestServer (vpnUp=$vpnUp blank=${selected.isNullOrBlank()} missing=${!selectedInPool} selectedHealthyWhenDown=$selectedHealthyWhenDown)",
+                    "refresh: pickBestServer (vpnUp=$vpnUp blank=${selected.isNullOrBlank()} missing=${!selectedInPool} selectedHealthyWhenDown=$selectedHealthyWhenDown selectedRealHealthyWhenDown=$selectedRealHealthyWhenDown)",
                 )
                 // #region agent log
                 VolkvnAgentDebug.emit(

@@ -435,6 +435,9 @@
     <string name="volkvn_simple_switch_label">Включить</string>
     <string name="volkvn_simple_footer">восстанавливает работу Telegram, WhatsApp, YouTube</string>
     <string name="volkvn_share_debug_log">Отправить отладочный лог</string>
+    <string name="volkvn_clear_debug_log">Очистить отладочный лог</string>
+    <string name="volkvn_debug_log_cleared">Лог очищен. Новые события пишутся с этого момента.</string>
+    <string name="volkvn_clear_debug_failed">Не удалось очистить лог.</string>
     <string name="volkvn_share_debug_failed">Не удалось подготовить файл лога.</string>
     <string name="volkvn_advanced_mode">Расширенный режим</string>
     <string name="volkvn_back_to_simple">К простому экрану</string>

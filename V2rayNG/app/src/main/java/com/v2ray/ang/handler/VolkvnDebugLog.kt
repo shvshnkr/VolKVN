@@ -68,6 +68,23 @@ object VolkvnDebugLog {
         }
     }
 
+    /**
+     * Deletes the on-device debug log and resets the session header so the next [log] starts fresh.
+     * Use before reproducing a failure so a shared log contains only that run.
+     */
+    fun clear(context: Context): Boolean {
+        synchronized(lock) {
+            return try {
+                sessionHeaderWritten = false
+                val f = File(context.applicationContext.cacheDir, FILE_NAME)
+                if (f.exists()) f.delete() else true
+            } catch (e: Exception) {
+                Log.w(TAG, "clear failed", e)
+                false
+            }
+        }
+    }
+
     private fun trimTail(f: File) {
         try {
             val bytes = f.readBytes()

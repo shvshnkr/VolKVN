@@ -2,12 +2,6 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/search_view"
-        android:icon="@drawable/ic_outline_filter_alt_24"
-        android:title="@string/menu_item_search"
-        app:actionViewClass="androidx.appcompat.widget.SearchView"
-        app:showAsAction="always|collapseActionView" />
-    <item
         android:id="@+id/real_ping_all_quick"
         android:icon="@drawable/ic_check_update_24dp"
         android:title="@string/title_real_ping_all_server"

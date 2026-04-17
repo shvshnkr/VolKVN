@@ -2,15 +2,16 @@ package com.v2ray.ang.handler
 
 import android.content.Context
 import android.util.Log
+import java.util.UUID
 import org.json.JSONObject
 
 /**
- * Debug-session NDJSON (session fa7510) — только в общий [VolkvnDebugLog] (тег AGENT), строка = один JSON.
+ * Debug-session NDJSON emitter for agent debugging.
  */
 object VolkvnAgentDebug {
 
     private const val TAG = "VolkvnAgentDebug"
-    const val SESSION_ID = "fa7510"
+    private const val SESSION_ID = "a41dbf"
 
     fun emit(
         context: Context,
@@ -22,6 +23,7 @@ object VolkvnAgentDebug {
     ) {
         // #region agent log
         val ts = System.currentTimeMillis()
+        val effectiveRunId = if (runId.isNullOrBlank()) "baseline" else runId
         val dataJson = JSONObject()
         for ((k, v) in data) {
             when (v) {
@@ -34,11 +36,12 @@ object VolkvnAgentDebug {
         val root = JSONObject()
         root.put("sessionId", SESSION_ID)
         root.put("timestamp", ts)
+        root.put("id", "log_${ts}_${UUID.randomUUID().toString().take(8)}")
         root.put("hypothesisId", hypothesisId)
+        root.put("runId", effectiveRunId)
         root.put("location", location)
         root.put("message", message)
         root.put("data", dataJson)
-        if (!runId.isNullOrBlank()) root.put("runId", runId)
         val line = root.toString()
         try {
             VolkvnDebugLog.log(context.applicationContext, "AGENT", line)

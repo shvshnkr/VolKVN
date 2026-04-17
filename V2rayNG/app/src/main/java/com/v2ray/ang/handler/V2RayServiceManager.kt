@@ -33,7 +33,8 @@ import java.lang.ref.SoftReference
 
 object V2RayServiceManager {
     private const val WATCHDOG_INTERVAL_MS = 4 * 60 * 1000L
-    private const val WATCHDOG_INITIAL_DELAY_MS = 90 * 1000L
+    // Long initial delay leaves user on a dead node for too long after start.
+    private const val WATCHDOG_INITIAL_DELAY_MS = 12 * 1000L
     private const val WATCHDOG_FAILURE_THRESHOLD = 2
     private const val WATCHDOG_STARTUP_INTERVAL_MS = 20 * 1000L
     private const val WATCHDOG_STARTUP_ROUNDS = 3
@@ -187,6 +188,21 @@ object V2RayServiceManager {
             if (service != null) {
                 val msg = if (error == null) reason else "$reason: ${error.message ?: error.javaClass.simpleName}"
                 VolkvnDebugLog.log(service, "StartCore", msg)
+                val netlinkDenied = (error?.message ?: "").contains("netlinkrib", ignoreCase = true)
+                // #region agent log
+                VolkvnAgentDebug.emit(
+                    service,
+                    hypothesisId = "H36",
+                    location = "V2RayServiceManager.kt:startCoreLoop:fail",
+                    message = "start_failure_detail",
+                    data = mapOf(
+                        "reason" to reason,
+                        "netlinkDenied" to netlinkDenied,
+                        "errorClass" to (error?.javaClass?.simpleName ?: ""),
+                        "errorMessage" to (error?.message ?: ""),
+                    ),
+                )
+                // #endregion
                 MessageUtil.sendMsg2UI(service, AppConfig.MSG_STATE_START_FAILURE, msg)
             }
             return false
@@ -202,6 +218,25 @@ object V2RayServiceManager {
             Log.e(AppConfig.TAG, "StartCore-Manager: Service is null")
             return false
         }
+
+        val assetDir = Utils.userAssetPath(service)
+        val geositeFile = File(assetDir, AppConfig.GEOSITE_DAT)
+        val geoipFile = File(assetDir, AppConfig.GEOIP_DAT)
+        // #region agent log
+        VolkvnAgentDebug.emit(
+            service,
+            hypothesisId = "H26",
+            location = "V2RayServiceManager.kt:startCoreLoop",
+            message = "geo_files_state_before_start",
+            data = mapOf(
+                "assetDir" to assetDir,
+                "geositeExists" to geositeFile.exists(),
+                "geositeSize" to geositeFile.length(),
+                "geoipExists" to geoipFile.exists(),
+                "geoipSize" to geoipFile.length(),
+            ),
+        )
+        // #endregion
 
         val guid = MmkvManager.getSelectServer()
         if (guid == null) {
@@ -271,14 +306,24 @@ object V2RayServiceManager {
         stopConnectionWatchdog()
 
         if (coreController.isRunning) {
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    coreController.stopLoop()
-                } catch (e: Exception) {
-                    Log.e(AppConfig.TAG, "StartCore-Manager: Failed to stop V2Ray loop", e)
-                }
+            try {
+                // Stop synchronously to avoid START_SUCCESS/STOP_SUCCESS reordering races in UI state.
+                coreController.stopLoop()
+            } catch (e: Exception) {
+                Log.e(AppConfig.TAG, "StartCore-Manager: Failed to stop V2Ray loop", e)
             }
         }
+        // #region agent log
+        VolkvnAgentDebug.emit(
+            service,
+            hypothesisId = "H22",
+            location = "V2RayServiceManager.kt:stopCoreLoop",
+            message = "stop_core_loop_completed",
+            data = mapOf(
+                "coreRunningAfterStop" to coreController.isRunning,
+            ),
+        )
+        // #endregion
 
         MessageUtil.sendMsg2UI(service, AppConfig.MSG_STATE_STOP_SUCCESS, "")
         NotificationManager.cancelNotification()
@@ -344,6 +389,9 @@ object V2RayServiceManager {
                             "directUp" to directUp,
                             "directDown" to directDown,
                             "coreRunning" to coreController.isRunning,
+                            "selectedGuid" to (MmkvManager.getSelectServer() ?: ""),
+                            "currentServer" to (currentConfig?.server ?: ""),
+                            "currentPort" to (currentConfig?.serverPort ?: ""),
                         ),
                     )
                     // #endregion
@@ -361,6 +409,20 @@ object V2RayServiceManager {
                         runCatching {
                             VolkvnServerSelector.pickBestServer(service, targetSubId)
                         }
+                        // #region agent log
+                        VolkvnAgentDebug.emit(
+                            service,
+                            hypothesisId = "H42",
+                            location = "V2RayServiceManager.kt:startConnectionWatchdog",
+                            message = "watchdog_restart_plan",
+                            data = mapOf(
+                                "failedGuidLen" to (failedGuid?.length ?: 0),
+                                "targetSubId" to targetSubId,
+                                "nextGuidLen" to (MmkvManager.getSelectServer()?.length ?: 0),
+                                "consecutiveFailures" to consecutiveFailures,
+                            ),
+                        )
+                        // #endregion
                         withContext(Dispatchers.Main) {
                             stopVService(service)
                             delay(700)
@@ -455,6 +517,21 @@ object V2RayServiceManager {
                             "Watchdog",
                             "network handoff recover ($reason): $detail [count=$networkHandoffFailureCount]",
                         )
+                        // #region agent log
+                        VolkvnAgentDebug.emit(
+                            service,
+                            hypothesisId = "H43",
+                            location = "V2RayServiceManager.kt:onUnderlyingNetworkChanged",
+                            message = "handoff_restart_plan",
+                            data = mapOf(
+                                "failedGuidLen" to (failedGuid?.length ?: 0),
+                                "targetSubId" to targetSubId,
+                                "nextGuidLen" to (MmkvManager.getSelectServer()?.length ?: 0),
+                                "failureCount" to networkHandoffFailureCount,
+                                "reason" to reason,
+                            ),
+                        )
+                        // #endregion
                         withContext(Dispatchers.Main) {
                             stopVService(service)
                             delay(700)

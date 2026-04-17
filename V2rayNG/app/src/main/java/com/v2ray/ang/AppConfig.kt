@@ -153,8 +153,10 @@ object AppConfig {
     const val DNS_VPN = "1.1.1.1"
     const val GEOSITE_PRIVATE = "geosite:private"
     const val GEOSITE_CN = "geosite:cn"
+    const val GEOSITE_RU = "geosite:ru"
     const val GEOIP_PRIVATE = "geoip:private"
     const val GEOIP_CN = "geoip:cn"
+    const val GEOIP_RU = "geoip:ru"
 
     /** Geo data file names. */
     const val GEOSITE_DAT = "geosite.dat"
@@ -296,8 +298,8 @@ object AppConfig {
     )
 
     val GEO_FILES_SOURCES = arrayListOf(
-        "Loyalsoldier/v2ray-rules-dat",
         "runetfreedom/russia-v2ray-rules-dat",
+        "Loyalsoldier/v2ray-rules-dat",
         "Chocolate4U/Iran-v2ray-rules"
     )
 

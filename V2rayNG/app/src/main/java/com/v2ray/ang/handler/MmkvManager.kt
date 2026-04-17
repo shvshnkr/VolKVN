@@ -284,6 +284,23 @@ object MmkvManager {
     }
 
     /**
+     * Reorders [decodeServerList] for [subscriptionId] by stored real/tcp test delay (ascending).
+     * Entries without a positive delay sort last (same rule as UI "sort by test results").
+     */
+    fun sortServerListByTestDelay(subscriptionId: String?) {
+        val subId = getSubscriptionId(subscriptionId)
+        val serverListToSort = decodeServerList(subId)
+        if (serverListToSort.isEmpty()) {
+            return
+        }
+        val sorted = serverListToSort.sortedBy { key ->
+            val delay = decodeServerAffiliationInfo(key)?.testDelayMillis ?: 0L
+            if (delay <= 0L) 999_999L else delay
+        }.toMutableList()
+        encodeServerList(sorted, subId)
+    }
+
+    /**
      * Removes all server configurations.
      *
      * @return The number of server configurations removed.

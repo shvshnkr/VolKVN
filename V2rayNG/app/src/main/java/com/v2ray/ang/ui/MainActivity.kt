@@ -14,7 +14,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.widget.SearchView
 import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.isVisible
@@ -33,6 +32,8 @@ import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.V2RayServiceManager
+import com.v2ray.ang.handler.VolkvnDebugLog
+import com.v2ray.ang.handler.VolkvnAgentDebug
 import com.v2ray.ang.handler.VolkvnVpnBootstrap
 import com.v2ray.ang.util.Utils
 import com.v2ray.ang.viewmodel.MainViewModel
@@ -61,8 +62,29 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         }
     }
     private val requestActivityLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        if (SettingsChangeManager.consumeRestartService() && mainViewModel.isRunning.value == true) {
-            restartV2Ray()
+        val restartRequested = SettingsChangeManager.consumeRestartService()
+        val runningLive = mainViewModel.isRunning.value == true
+        val coreRunning = V2RayServiceManager.isRunning()
+        val shouldRestartNow = restartRequested && coreRunning
+        // #region agent log
+        VolkvnAgentDebug.emit(
+            this,
+            hypothesisId = "H30",
+            location = "MainActivity.kt:requestActivityLauncher",
+            message = "settings_result_received",
+            data = mapOf(
+                "resultCode" to it.resultCode,
+                "restartRequested" to restartRequested,
+                "runningLive" to runningLive,
+                "coreRunning" to coreRunning,
+                "shouldRestartNow" to shouldRestartNow,
+                "selectedGuidLen" to (MmkvManager.getSelectServer()?.length ?: 0),
+                "diagnostics" to Utils.vpnUiDiagnostics(this),
+            ),
+        )
+        // #endregion
+        if (shouldRestartNow) {
+            restartV2Ray("settings_result")
         }
         if (SettingsChangeManager.consumeSetupGroupTab()) {
             setupGroupTab()
@@ -204,8 +226,24 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         }
     }
 
-    fun restartV2Ray() {
-        if (mainViewModel.isRunning.value == true) {
+    fun restartV2Ray(reason: String = "manual") {
+        val runningLive = mainViewModel.isRunning.value == true
+        val coreRunning = V2RayServiceManager.isRunning()
+        // #region agent log
+        VolkvnAgentDebug.emit(
+            this,
+            hypothesisId = "H35",
+            location = "MainActivity.kt:restartV2Ray",
+            message = "restart_requested",
+            data = mapOf(
+                "reason" to reason,
+                "runningLive" to runningLive,
+                "coreRunning" to coreRunning,
+                "diagnostics" to Utils.vpnUiDiagnostics(this),
+            ),
+        )
+        // #endregion
+        if (runningLive) {
             V2RayServiceManager.stopVService(this)
         }
         lifecycleScope.launch {
@@ -249,24 +287,6 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu_main, menu)
-
-        val searchItem = menu.findItem(R.id.search_view)
-        if (searchItem != null) {
-            val searchView = searchItem.actionView as SearchView
-            searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-                override fun onQueryTextSubmit(query: String?): Boolean = false
-
-                override fun onQueryTextChange(newText: String?): Boolean {
-                    mainViewModel.filterConfig(newText.orEmpty())
-                    return false
-                }
-            })
-
-            searchView.setOnCloseListener {
-                mainViewModel.filterConfig("")
-                false
-            }
-        }
         return super.onCreateOptionsMenu(menu)
     }
 
@@ -684,6 +704,13 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
             R.id.settings -> requestActivityLauncher.launch(Intent(this, SettingsActivity::class.java))
             R.id.promotion -> Utils.openUri(this, "${Utils.decode(AppConfig.APP_PROMOTION_URL)}?t=${System.currentTimeMillis()}")
             R.id.logcat -> startActivity(Intent(this, LogcatActivity::class.java))
+            R.id.volkvn_clear_debug_log -> {
+                if (VolkvnDebugLog.clear(this)) {
+                    toast(R.string.volkvn_debug_log_cleared)
+                } else {
+                    toast(R.string.volkvn_clear_debug_failed)
+                }
+            }
             R.id.backup_restore -> requestActivityLauncher.launch(Intent(this, BackupActivity::class.java))
             R.id.about -> startActivity(Intent(this, AboutActivity::class.java))
         }

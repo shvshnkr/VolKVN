@@ -62,8 +62,9 @@ object SettingsManager {
      * @param index The index of the routing type.
      * @return A mutable list of RulesetItem.
      */
-    private fun getPresetRoutingRulesets(context: Context, index: Int = 0): MutableList<RulesetItem>? {
+    private fun getPresetRoutingRulesets(context: Context, index: Int = 4): MutableList<RulesetItem>? {
         val fileName = RoutingType.fromIndex(index).fileName
+        VolkvnDebugLog.log(context, ANG_PACKAGE, "initRoutingRulesets preset=${RoutingType.fromIndex(index).name} file=$fileName")
         val assets = Utils.readTextFromAssets(context, fileName)
         if (TextUtils.isEmpty(assets)) {
             return null
@@ -306,15 +307,32 @@ object SettingsManager {
             val geo = arrayOf(AppConfig.GEOSITE_DAT, AppConfig.GEOIP_DAT, AppConfig.GEOIP_ONLY_CN_PRIVATE_DAT)
             assets.list("")
                 ?.filter { geo.contains(it) }
-                ?.filter { !File(extFolder, it).exists() }
                 ?.forEach {
                     val target = File(extFolder, it)
-                    assets.open(it).use { input ->
-                        FileOutputStream(target).use { output ->
-                            input.copyTo(output)
+                    val existedBefore = target.exists()
+                    if (!existedBefore) {
+                        assets.open(it).use { input ->
+                            FileOutputStream(target).use { output ->
+                                input.copyTo(output)
+                            }
                         }
+                        Log.i(AppConfig.TAG, "Copied from apk assets folder to ${target.absolutePath}")
                     }
-                    Log.i(AppConfig.TAG, "Copied from apk assets folder to ${target.absolutePath}")
+                    // #region agent log
+                    VolkvnAgentDebug.emit(
+                        context,
+                        hypothesisId = "H27",
+                        location = "SettingsManager.kt:initAssets",
+                        message = "geo_asset_init_state",
+                        data = mapOf(
+                            "name" to it,
+                            "existedBefore" to existedBefore,
+                            "copiedFromApk" to !existedBefore,
+                            "sizeAfter" to target.length(),
+                            "path" to target.absolutePath,
+                        ),
+                    )
+                    // #endregion
                 }
         } catch (e: Exception) {
             Log.e(ANG_PACKAGE, "asset copy failed", e)

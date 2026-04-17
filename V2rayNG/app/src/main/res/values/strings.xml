@@ -446,6 +446,9 @@
     <string name="volkvn_simple_switch_label">Turn on</string>
     <string name="volkvn_simple_footer">Restores Telegram, WhatsApp, and YouTube</string>
     <string name="volkvn_share_debug_log">Share debug log</string>
+    <string name="volkvn_clear_debug_log">Clear debug log</string>
+    <string name="volkvn_debug_log_cleared">Debug log cleared. New events will be recorded from now.</string>
+    <string name="volkvn_clear_debug_failed">Could not clear the debug log.</string>
     <string name="volkvn_share_debug_failed">Could not prepare the log file.</string>
     <string name="volkvn_advanced_mode">Advanced</string>
     <string name="volkvn_back_to_simple">Back to simple screen</string>

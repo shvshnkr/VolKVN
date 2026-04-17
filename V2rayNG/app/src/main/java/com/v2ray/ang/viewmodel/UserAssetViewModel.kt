@@ -15,7 +15,7 @@ import java.net.HttpURLConnection
 
 class UserAssetViewModel : ViewModel() {
     private val assets = mutableListOf<AssetUrlCache>()
-    private val builtInGeoFiles = listOf(AppConfig.GEOSITE_DAT, AppConfig.GEOIP_DAT, AppConfig.GEOIP_ONLY_CN_PRIVATE_DAT)
+    private val builtInGeoFiles = listOf(AppConfig.GEOSITE_DAT, AppConfig.GEOIP_DAT)
 
     val itemCount: Int
         get() = assets.size
@@ -47,18 +47,7 @@ class UserAssetViewModel : ViewModel() {
                     )
                 )
             }
-        // Force update URL for geoip-only-cn-private.dat
-        return (builtInItems + savedAssets).map { cache ->
-            if (cache.assetUrl.remarks == AppConfig.GEOIP_ONLY_CN_PRIVATE_DAT) {
-                cache.copy(
-                    assetUrl = cache.assetUrl.copy(
-                        url = AppConfig.GEOIP_ONLY_CN_PRIVATE_URL
-                    )
-                )
-            } else {
-                cache
-            }
-        }
+        return builtInItems + savedAssets
     }
 
     fun downloadGeoFiles(extDir: File, httpPort: Int): GeoDownloadResult {

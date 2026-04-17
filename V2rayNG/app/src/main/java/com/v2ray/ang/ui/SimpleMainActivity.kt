@@ -39,7 +39,6 @@ class SimpleMainActivity : HelperBaseActivity() {
     private lateinit var binding: ActivitySimpleMainBinding
     private val mainViewModel: MainViewModel by viewModels()
     private var lastRunningLogged: Boolean? = null
-    private var lastPreconnectRefreshAt = 0L
     private var initialPoolRefreshDone = false
     private var preconnectRefreshInProgress = false
 
@@ -147,6 +146,8 @@ class SimpleMainActivity : HelperBaseActivity() {
     }
 
     private fun onConnectSwitch(isChecked: Boolean) {
+        val runningLive = mainViewModel.isRunning.value == true
+        val transportActive = Utils.isVpnTransportActive(this)
         // #region agent log
         VolkvnAgentDebug.emit(
             this,
@@ -155,13 +156,45 @@ class SimpleMainActivity : HelperBaseActivity() {
             message = "connect_switch_toggled",
             data = mapOf(
                 "isChecked" to isChecked,
-                "isRunningLive" to (mainViewModel.isRunning.value ?: false),
+                "isRunningLive" to runningLive,
+                "transportActive" to transportActive,
                 "initialPoolRefreshDone" to initialPoolRefreshDone,
                 "selectedGuidLen" to (MmkvManager.getSelectServer()?.length ?: 0),
             ),
         )
         // #endregion
-        if (mainViewModel.isRunning.value == isChecked) return
+        if (isChecked && runningLive && transportActive) {
+            // #region agent log
+            VolkvnAgentDebug.emit(
+                this,
+                hypothesisId = "H16",
+                location = "SimpleMainActivity.kt:onConnectSwitch",
+                message = "early_return_already_running",
+                data = mapOf(
+                    "isChecked" to isChecked,
+                    "isRunningLive" to runningLive,
+                    "transportActive" to transportActive,
+                ),
+            )
+            // #endregion
+            return
+        }
+        if (!isChecked && !runningLive && !transportActive) {
+            // #region agent log
+            VolkvnAgentDebug.emit(
+                this,
+                hypothesisId = "H16",
+                location = "SimpleMainActivity.kt:onConnectSwitch",
+                message = "early_return_already_stopped",
+                data = mapOf(
+                    "isChecked" to isChecked,
+                    "isRunningLive" to runningLive,
+                    "transportActive" to transportActive,
+                ),
+            )
+            // #endregion
+            return
+        }
 
         if (!isChecked) {
             V2RayServiceManager.stopVService(this)
@@ -202,10 +235,24 @@ class SimpleMainActivity : HelperBaseActivity() {
         lifecycleScope.launch {
             if (preconnectRefreshInProgress) {
                 VolkvnDebugLog.log(this@SimpleMainActivity, "SimpleMain", "preconnect refresh: skip in progress")
+                // #region agent log
+                VolkvnAgentDebug.emit(
+                    this@SimpleMainActivity,
+                    hypothesisId = "H44",
+                    location = "SimpleMainActivity.kt:startV2RayWithPreflight",
+                    message = "preconnect_refresh_in_progress_start_immediately",
+                    data = mapOf(
+                        "selectedGuidLen" to (MmkvManager.getSelectServer()?.length ?: 0),
+                    ),
+                )
+                // #endregion
+                V2RayServiceManager.startVService(this@SimpleMainActivity)
                 return@launch
             }
             val now = System.currentTimeMillis()
-            val needRefresh = now - lastPreconnectRefreshAt >= PRECONNECT_REFRESH_MIN_INTERVAL_MS
+            val lastGlobalPoolRefreshAt =
+                MmkvManager.decodeSettingsLong(AppConfig.PREF_VOLKVN_LAST_POOL_REFRESH_AT, 0L)
+            val needRefresh = now - lastGlobalPoolRefreshAt >= PRECONNECT_REFRESH_MIN_INTERVAL_MS
             if (needRefresh) {
                 preconnectRefreshInProgress = true
                 binding.tvStatus.text = getString(R.string.volkvn_simple_status_refreshing)
@@ -217,7 +264,10 @@ class SimpleMainActivity : HelperBaseActivity() {
                     location = "SimpleMainActivity.kt:startV2RayWithPreflight",
                     message = "before_preconnect_refresh",
                     data = mapOf(
+                        "selectedGuid" to (MmkvManager.getSelectServer() ?: ""),
                         "selectedGuidLen" to (MmkvManager.getSelectServer()?.length ?: 0),
+                        "lastGlobalPoolRefreshAt" to lastGlobalPoolRefreshAt,
+                        "msSinceGlobalPoolRefresh" to (now - lastGlobalPoolRefreshAt),
                         "needRefresh" to needRefresh,
                     ),
                 )
@@ -231,7 +281,6 @@ class SimpleMainActivity : HelperBaseActivity() {
                         "preconnect refresh failed: ${it.message ?: it.javaClass.simpleName}",
                     )
                 }
-                lastPreconnectRefreshAt = now
                 preconnectRefreshInProgress = false
             }
             // #region agent log
@@ -241,7 +290,10 @@ class SimpleMainActivity : HelperBaseActivity() {
                 location = "SimpleMainActivity.kt:beforeStartVService",
                 message = "about_to_start_vservice",
                 data = mapOf(
+                    "selectedGuid" to (MmkvManager.getSelectServer() ?: ""),
                     "selectedGuidLen" to (MmkvManager.getSelectServer()?.length ?: 0),
+                    "lastGlobalPoolRefreshAt" to lastGlobalPoolRefreshAt,
+                    "msSinceGlobalPoolRefresh" to (now - lastGlobalPoolRefreshAt),
                     "skippedRefreshDueToInterval" to !needRefresh,
                 ),
             )

@@ -41,6 +41,10 @@
             android:icon="@drawable/ic_logcat_24dp"
             android:title="@string/title_logcat" />
         <item
+            android:id="@+id/volkvn_clear_debug_log"
+            android:icon="@drawable/ic_delete_24dp"
+            android:title="@string/volkvn_clear_debug_log" />
+        <item
             android:id="@+id/backup_restore"
             android:icon="@drawable/ic_restore_24dp"
             android:title="@string/title_configuration_backup_restore" />

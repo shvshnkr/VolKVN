@@ -29,6 +29,7 @@ import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SpeedtestManager
 import com.v2ray.ang.handler.V2RayServiceManager
+import com.v2ray.ang.handler.VolkvnAgentDebug
 import com.v2ray.ang.handler.VolkvnServerSelector
 import com.v2ray.ang.util.MessageUtil
 import com.v2ray.ang.util.Utils
@@ -103,6 +104,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val app = getApplication<AngApplication>()
         val now = System.currentTimeMillis()
         if (autoRecoverInProgress || now - lastAutoRecoverAt < AUTO_RECOVER_MIN_INTERVAL_MS) {
+            // #region agent log
+            VolkvnAgentDebug.emit(
+                app,
+                hypothesisId = "H41",
+                location = "MainViewModel.kt:maybeAutoRecoverConnection",
+                message = "auto_recover_skipped_gate",
+                data = mapOf(
+                    "reason" to reason,
+                    "inProgress" to autoRecoverInProgress,
+                    "msSinceLastRecover" to (now - lastAutoRecoverAt),
+                    "minIntervalMs" to AUTO_RECOVER_MIN_INTERVAL_MS,
+                ),
+            )
+            // #endregion
             return
         }
         autoRecoverInProgress = true
@@ -118,6 +133,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         !selectedSubId.isNullOrBlank() -> selectedSubId
                         else -> AppConfig.VOLKVN_SUBSCRIPTION_ID
                     }
+                // #region agent log
+                VolkvnAgentDebug.emit(
+                    app,
+                    hypothesisId = "H40",
+                    location = "MainViewModel.kt:maybeAutoRecoverConnection",
+                    message = "auto_recover_plan",
+                    data = mapOf(
+                        "reason" to reason,
+                        "selectedGuidLen" to (selectedGuid?.length ?: 0),
+                        "targetSubId" to targetSubId,
+                        "subscriptionIdArg" to subscriptionId,
+                    ),
+                )
+                // #endregion
                 VolkvnServerSelector.markServerUnhealthy(selectedGuid, "autoRecover:$reason")
                 VolkvnServerSelector.pickBestServer(app, targetSubId)
                 withContext(Dispatchers.Main) {
@@ -447,21 +476,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * @param subId The subscription ID to sort servers for.
      */
     private fun sortByTestResultsForSub(subId: String) {
-        data class ServerDelay(var guid: String, var testDelayMillis: Long)
-
-        val serverDelays = mutableListOf<ServerDelay>()
-        val serverListToSort = MmkvManager.decodeServerList(subId)
-
-        serverListToSort.forEach { key ->
-            val delay = MmkvManager.decodeServerAffiliationInfo(key)?.testDelayMillis ?: 0L
-            serverDelays.add(ServerDelay(key, if (delay <= 0L) 999999 else delay))
-        }
-        serverDelays.sortBy { it.testDelayMillis }
-
-        val sortedServerList = serverDelays.map { it.guid }.toMutableList()
-
-        // Save the sorted list for this subscription
-        MmkvManager.encodeServerList(sortedServerList, subId)
+        MmkvManager.sortServerListByTestDelay(subId)
     }
 
 
@@ -504,9 +519,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 removeInvalidServer()
             }
 
-            if (MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_SORT_AFTER_TEST)) {
-                sortByTestResults()
-            }
+            // Always re-order by measured delay after batch real-ping (toolbar + menu).
+            sortByTestResults()
 
             withContext(Dispatchers.Main) {
                 reloadServerList()
@@ -548,7 +562,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     trustDaemonProcessForOptimisticUi = false
                     getApplication<AngApplication>().toastError(R.string.toast_services_failure)
                     isRunning.value = false
-                    VolkvnDebugLog.log(getApplication(), "MainVM", "broadcast START_FAILURE")
+                    val app = getApplication<AngApplication>()
+                    VolkvnDebugLog.log(app, "MainVM", "broadcast START_FAILURE")
                     maybeAutoRecoverConnection("broadcast START_FAILURE")
                 }
 
