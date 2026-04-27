@@ -466,6 +466,7 @@
     <string name="volkvn_simple_status_off">Disconnected</string>
     <string name="volkvn_simple_no_profile">No server selected. Wait for the list to update.</string>
     <string name="volkvn_subscription_remarks">VolKVN public pool</string>
+    <string name="volkvn_builtin_helpers_remarks">Built-in simple helpers (Trojan)</string>
     <string name="volkvn_err_no_server_selected">No profile selected. Wait until the list updates.</string>
     <string name="volkvn_err_decode_config">Could not read the selected profile. Try updating the list.</string>
     <string name="volkvn_err_invalid_server_address">Invalid server address in profile: %1$s</string>

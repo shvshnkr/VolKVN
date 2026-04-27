@@ -114,6 +114,7 @@ object VolkvnVpnBootstrap {
             }
 
             ensurePublicPoolSubscription(context)
+            VolkvnBuiltinBootstrap.ensureBuiltinHelpers(context)
             val merged = StringBuilder()
             for (raw in allPoolSourceUrls(context)) {
                 val url = HttpUtil.toIdnUrl(raw.trim())
@@ -149,8 +150,9 @@ object VolkvnVpnBootstrap {
             // #endregion
             val selected = MmkvManager.getSelectServer()
             val guids = MmkvManager.decodeServerList(subId)
+            val mergedPoolGuids = VolkvnBuiltinBootstrap.mergePublicAndBuiltinGuids().toSet()
             val vpnUp = Utils.isVpnTransportActive(context.applicationContext)
-            val selectedInPool = selected != null && selected in guids
+            val selectedInPool = selected != null && selected in mergedPoolGuids
             val selectedHealthyWhenDown =
                 if (!vpnUp && selectedInPool) VolkvnServerSelector.isServerTcpHealthy(context, selected, attempts = 2) else true
             val selectedRealHealthyWhenDown =
@@ -166,9 +168,10 @@ object VolkvnVpnBootstrap {
                 hypothesisId = "H5",
                 location = "VolkvnVpnBootstrap.kt:afterImport",
                 message = "needPick_decision",
-                data = mapOf(
+                    data = mapOf(
                     "importCount" to count,
                     "guidsSize" to guids.size,
+                    "mergedPoolSize" to mergedPoolGuids.size,
                     "selectedPresent" to !selected.isNullOrBlank(),
                     "selectedInPool" to selectedInPool,
                     "vpnUp" to vpnUp,
@@ -282,6 +285,7 @@ object VolkvnVpnBootstrap {
      */
     fun applySimpleModeDefaults(context: Context) {
         ensurePublicPoolSubscription(context)
+        VolkvnBuiltinBootstrap.ensureBuiltinHelpers(context)
         // false = xray-core built-in TUN (no libhev-socks5-tunnel.so). Hev tunnel requires native libs from compile-hevtun.sh in app/libs — not shipped in this fork.
         MmkvManager.encodeSettings(AppConfig.PREF_USE_HEV_TUNNEL, false)
         MmkvManager.encodeSettings(AppConfig.PREF_PER_APP_PROXY, true)

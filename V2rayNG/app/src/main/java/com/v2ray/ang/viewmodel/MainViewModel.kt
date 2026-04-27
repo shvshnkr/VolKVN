@@ -148,7 +148,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 // #endregion
                 VolkvnServerSelector.markServerUnhealthy(selectedGuid, "autoRecover:$reason")
-                VolkvnServerSelector.pickBestServer(app, targetSubId)
+                val moved = VolkvnServerSelector.tryMoveToFallback(selectedGuid)
+                if (moved == null) {
+                    VolkvnServerSelector.pickBestServer(app, targetSubId)
+                }
                 withContext(Dispatchers.Main) {
                     V2RayServiceManager.stopVService(app)
                     delay(450)
@@ -556,6 +559,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     getApplication<AngApplication>().toastSuccess(R.string.toast_services_success)
                     isRunning.value = true
                     VolkvnDebugLog.log(getApplication(), "MainVM", "broadcast START_SUCCESS")
+                    MmkvManager.getSelectServer()?.let { VolkvnServerSelector.markConnected(it) }
                 }
 
                 AppConfig.MSG_STATE_START_FAILURE -> {

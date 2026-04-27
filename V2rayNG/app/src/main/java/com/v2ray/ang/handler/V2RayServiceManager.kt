@@ -406,8 +406,13 @@ object V2RayServiceManager {
                         val targetSubId = currentConfig?.subscriptionId ?: AppConfig.VOLKVN_SUBSCRIPTION_ID
                         VolkvnDebugLog.log(service, "Watchdog", "auto-recover: reselect + restart (reason=$detail)")
                         VolkvnServerSelector.markServerUnhealthy(failedGuid, "watchdog:$detail")
-                        runCatching {
-                            VolkvnServerSelector.pickBestServer(service, targetSubId)
+                        val moved = VolkvnServerSelector.tryMoveToFallback(failedGuid)
+                        if (moved == null) {
+                            try {
+                                VolkvnServerSelector.pickBestServer(service, targetSubId)
+                            } catch (e: Exception) {
+                                Log.e(AppConfig.TAG, "Watchdog pickBestServer failed", e)
+                            }
                         }
                         // #region agent log
                         VolkvnAgentDebug.emit(
@@ -496,8 +501,13 @@ object V2RayServiceManager {
                         val failedGuid = MmkvManager.getSelectServer()
                         val targetSubId = currentConfig?.subscriptionId ?: AppConfig.VOLKVN_SUBSCRIPTION_ID
                         VolkvnServerSelector.markServerUnhealthy(failedGuid, "handoff:$reason:$detail")
-                        runCatching {
-                            VolkvnServerSelector.pickBestServer(service, targetSubId)
+                        val movedHandoff = VolkvnServerSelector.tryMoveToFallback(failedGuid)
+                        if (movedHandoff == null) {
+                            try {
+                                VolkvnServerSelector.pickBestServer(service, targetSubId)
+                            } catch (e: Exception) {
+                                Log.e(AppConfig.TAG, "Handoff pickBestServer failed", e)
+                            }
                         }
                         // #region agent log
                         VolkvnAgentDebug.emit(

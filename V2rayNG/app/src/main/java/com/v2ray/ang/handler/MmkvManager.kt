@@ -7,6 +7,9 @@ import com.v2ray.ang.AppConfig.PREF_ROUTING_RULESET
 import com.v2ray.ang.AppConfig.CACHE_SUBSCRIPTION_ID
 import com.v2ray.ang.AppConfig.PREF_VOLKVN_LAST_POOL_REFRESH_AT
 import com.v2ray.ang.AppConfig.PREF_VOLKVN_USER_POOL_URLS
+import com.v2ray.ang.AppConfig.PREF_AUTO_SELECT_FALLBACK_INDEX
+import com.v2ray.ang.AppConfig.PREF_AUTO_SELECT_FALLBACK_QUEUE
+import com.v2ray.ang.AppConfig.PREF_AUTO_SELECT_LAST_KNOWN_GOOD
 import com.v2ray.ang.AppConfig.VOLKVN_SUBSCRIPTION_ID
 import com.v2ray.ang.dto.AssetUrlCache
 import com.v2ray.ang.dto.AssetUrlItem
@@ -716,6 +719,32 @@ object MmkvManager {
      */
     fun decodeStartOnBoot(): Boolean {
         return decodeSettingsBool(PREF_IS_BOOTED, false)
+    }
+
+    /** Comma-separated GUID queue for auto-select fallback (Husi-style). */
+    fun getAutoSelectFallbackQueue(): String =
+        decodeSettingsString(PREF_AUTO_SELECT_FALLBACK_QUEUE, "").orEmpty()
+
+    fun setAutoSelectFallbackQueue(csv: String) {
+        encodeSettings(PREF_AUTO_SELECT_FALLBACK_QUEUE, csv)
+    }
+
+    fun getAutoSelectFallbackIndex(): Int =
+        decodeSettingsInt(PREF_AUTO_SELECT_FALLBACK_INDEX, 0)
+
+    fun setAutoSelectFallbackIndex(index: Int) {
+        encodeSettings(PREF_AUTO_SELECT_FALLBACK_INDEX, index)
+    }
+
+    fun getAutoSelectLastKnownGood(): String? =
+        decodeSettingsString(PREF_AUTO_SELECT_LAST_KNOWN_GOOD)
+
+    fun setAutoSelectLastKnownGood(guid: String?) {
+        if (guid.isNullOrBlank()) {
+            settingsStorage.remove(PREF_AUTO_SELECT_LAST_KNOWN_GOOD)
+        } else {
+            encodeSettings(PREF_AUTO_SELECT_LAST_KNOWN_GOOD, guid)
+        }
     }
 
     //endregion

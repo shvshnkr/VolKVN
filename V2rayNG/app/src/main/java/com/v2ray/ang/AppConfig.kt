@@ -50,9 +50,14 @@ object AppConfig {
 
     /** Built-in public VLESS pool. */
     const val VOLKVN_SUBSCRIPTION_ID = "__volkvn_public__"
+    /** Husi-style built-in Trojan helpers (stable GUID profiles). */
+    const val VOLKVN_BUILTIN_HELPERS_SUBSCRIPTION_ID = "__volkvn_builtin_helpers__"
     const val VOLKVN_PUBLIC_POOL_WORK_NAME = "volkvn_public_pool_refresh"
     /** Wall-clock ms of last public pool fetch; cross-call debounce (main process only after WM fix). */
     const val PREF_VOLKVN_LAST_POOL_REFRESH_AT = "pref_volkvn_last_pool_refresh_at"
+    const val PREF_AUTO_SELECT_FALLBACK_QUEUE = "pref_auto_select_fallback_queue"
+    const val PREF_AUTO_SELECT_FALLBACK_INDEX = "pref_auto_select_fallback_index"
+    const val PREF_AUTO_SELECT_LAST_KNOWN_GOOD = "pref_auto_select_last_known_good"
 
     /**
      * Built-in public pool sources (always included). User-added URLs live in [PREF_VOLKVN_USER_POOL_URLS].
@@ -61,7 +66,9 @@ object AppConfig {
     val VOLKVN_SUBSCRIPTION_URLS: Array<String> = arrayOf(
         "https://mifa.world/vless",
         "https://raw.githubusercontent.com/mbelspb-gif/ffsfsfssdf/refs/heads/main/TG-swordware",
-        "https://raw.githubusercontent.com/mbelspb-gif/dddddad/refs/heads/main/Swordware.txt",
+        "https://raw.githubusercontent.com/HikaruApps/WhiteLattice/refs/heads/main/subscriptions/config.txt",
+        "https://raw.githubusercontent.com/SilentGhostCodes/WhiteListVpn/refs/heads/main/BlackList.txt",
+        "https://wlrus.lol/confs/blackl.txt",
         "https://raw.githubusercontent.com/zieng2/wl/main/vless_lite.txt",
     )
 
