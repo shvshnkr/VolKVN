@@ -408,11 +408,7 @@ object V2RayServiceManager {
                         VolkvnServerSelector.markServerUnhealthy(failedGuid, "watchdog:$detail")
                         val moved = VolkvnServerSelector.tryMoveToFallback(failedGuid)
                         if (moved == null) {
-                            try {
-                                VolkvnServerSelector.pickBestServer(service, targetSubId)
-                            } catch (e: Exception) {
-                                Log.e(AppConfig.TAG, "Watchdog pickBestServer failed", e)
-                            }
+                            reselectAfterUnhealthy(service, targetSubId)
                         }
                         // #region agent log
                         VolkvnAgentDebug.emit(
@@ -466,6 +462,7 @@ object V2RayServiceManager {
 
     fun onUnderlyingNetworkChanged(reason: String) {
         val service = getService() ?: return
+        VolkvnWhitelistNetworkState.onConnectivityMaybeChanged(service)
         if (!coreController.isRunning) return
         val now = System.currentTimeMillis()
         if (networkRecoveryInProgress || now - lastNetworkHandoffRecoveryAt < NETWORK_HANDOFF_MIN_INTERVAL_MS) {
@@ -503,11 +500,7 @@ object V2RayServiceManager {
                         VolkvnServerSelector.markServerUnhealthy(failedGuid, "handoff:$reason:$detail")
                         val movedHandoff = VolkvnServerSelector.tryMoveToFallback(failedGuid)
                         if (movedHandoff == null) {
-                            try {
-                                VolkvnServerSelector.pickBestServer(service, targetSubId)
-                            } catch (e: Exception) {
-                                Log.e(AppConfig.TAG, "Handoff pickBestServer failed", e)
-                            }
+                            reselectAfterUnhealthy(service, targetSubId)
                         }
                         // #region agent log
                         VolkvnAgentDebug.emit(
@@ -567,10 +560,27 @@ object V2RayServiceManager {
         }
     }
 
+    private suspend fun reselectAfterUnhealthy(context: Context, targetSubId: String) {
+        try {
+            val usePrepare = targetSubId == AppConfig.VOLKVN_SUBSCRIPTION_ID ||
+                targetSubId == AppConfig.VOLKVN_BUILTIN_HELPERS_SUBSCRIPTION_ID
+            if (usePrepare) {
+                when (val prep = VolkvnServerSelector.prepareForConnect(context)) {
+                    is PrepareForConnectResult.Success -> MmkvManager.setSelectServer(prep.guid)
+                    else -> VolkvnDebugLog.log(context, "Watchdog", "prepareForConnect failed: $prep")
+                }
+            } else {
+                VolkvnServerSelector.pickBestServer(context, targetSubId)
+            }
+        } catch (e: Exception) {
+            Log.e(AppConfig.TAG, "Reselect after unhealthy failed", e)
+        }
+    }
+
     private fun probeCoreHealth(): Pair<Boolean, String> {
         val service = getService()
-        val primaryUrl = SettingsManager.getDelayTestUrl()
-        val fallbackUrl = SettingsManager.getDelayTestUrl(true)
+        val primaryUrl = SettingsManager.getDelayTestUrlForConnect()
+        val fallbackUrl = SettingsManager.getDelayTestUrlForConnect(true)
         // #region agent log
         service?.let {
             VolkvnAgentDebug.emit(
@@ -681,8 +691,8 @@ object V2RayServiceManager {
             val service = getService() ?: return@launch
             var time = -1L
             var errorStr = ""
-            val primaryUrl = SettingsManager.getDelayTestUrl()
-            val fallbackUrl = SettingsManager.getDelayTestUrl(true)
+            val primaryUrl = SettingsManager.getDelayTestUrlForConnect()
+            val fallbackUrl = SettingsManager.getDelayTestUrlForConnect(true)
             // #region agent log
             VolkvnAgentDebug.emit(
                 service,

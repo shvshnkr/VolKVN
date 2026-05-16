@@ -3,9 +3,14 @@ package com.v2ray.ang.handler
 import android.content.Context
 import android.os.SystemClock
 import android.util.Log
+import com.v2ray.ang.AngApplication
 import com.v2ray.ang.AppConfig
+import com.v2ray.ang.R
 import com.v2ray.ang.dto.ProfileItem
 import com.v2ray.ang.enums.EConfigType
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.net.InetSocketAddress
 import java.net.Socket
 import kotlin.math.roundToLong
@@ -24,6 +29,9 @@ import kotlinx.coroutines.withContext
 object VolkvnServerSelector {
 
     private const val TAG = "VolkvnServerSelector"
+    private val prepareMutex = Mutex()
+    @Volatile
+    private var prepareGeneration = 0
     /** Cellular / DNS can be slow; too short → false negatives. */
     private const val PROBE_TIMEOUT_MS = 4000
     private const val FIRST_WAVE = 72
@@ -89,8 +97,70 @@ object VolkvnServerSelector {
         val next = queue[nextIndex]
         MmkvManager.setAutoSelectFallbackIndex(nextIndex)
         MmkvManager.setSelectServer(next)
+        SimpleModeStatusStore.setActivity(
+            AngApplication.application.getString(
+                R.string.volkvn_status_switching_server,
+                nextIndex + 1,
+                queue.size,
+            ),
+        )
         Log.i(TAG, "Fallback advance to $next ($nextIndex/${queue.size})")
         return next
+    }
+
+    fun cancelInFlightPrepare() {
+        prepareGeneration++
+    }
+
+    suspend fun prepareForConnect(
+        context: Context,
+        networkHandoff: Boolean = false,
+    ): PrepareForConnectResult = prepareMutex.withLock {
+        val generation = ++prepareGeneration
+        try {
+            VolkvnBuiltinBootstrap.ensureBuiltinHelpers(context)
+            val whitelistBuiltinOnly = MmkvManager.isActiveWhitelistRestrictedNetwork() ||
+                VolkvnSimpleModeNetwork.consumeWhitelistBuiltinPoolOnlyFlag()
+            val guids = VolkvnServerPoolBuilder.buildCandidateGuids(whitelistBuiltinOnly)
+            VolkvnDebugLog.simpleModeLog(
+                "24",
+                "prepare_pool wl=$whitelistBuiltinOnly handoff=$networkHandoff count=${guids.size}",
+            )
+            if (guids.isEmpty()) {
+                return@withLock PrepareForConnectResult.NoProfiles
+            }
+            val forceReason = VolkvnAutoSelectProbePolicy.forceFullProbeReason(
+                guids,
+                whitelistBuiltinOnly,
+                networkHandoff,
+            )
+            val lastKnown = MmkvManager.getAutoSelectLastKnownGood()
+            if (forceReason == null && !networkHandoff && !lastKnown.isNullOrBlank() && lastKnown in guids) {
+                if (isServerTcpHealthy(context, lastKnown, attempts = 2)) {
+                    MmkvManager.setSelectServer(lastKnown)
+                    VolkvnDebugLog.simpleModeLog("25", "prepare_skip_probe lastKnown=$lastKnown")
+                    return@withLock PrepareForConnectResult.Success(lastKnown)
+                }
+            }
+            if (forceReason != null) {
+                VolkvnDebugLog.simpleModeLog("25", "full_probe_forced reason=$forceReason")
+            }
+            SimpleModeStatusStore.setFromStringRes(context, R.string.volkvn_status_testing_servers)
+            val pick = pickBestServerInternal(
+                context,
+                guids,
+                whitelistBuiltinOnly,
+                networkHandoff,
+            )
+            if (pick == null) {
+                return@withLock PrepareForConnectResult.AllProbesDead
+            }
+            VolkvnAutoSelectProbePolicy.recordFullProbe(guids, whitelistBuiltinOnly)
+            PrepareForConnectResult.Success(pick)
+        } catch (e: CancellationException) {
+            VolkvnDebugLog.simpleModeLog("31", "prepare_aborted")
+            throw e
+        }
     }
 
     private fun tcpLatencyMs(host: String?, port: Int): Long {
@@ -222,9 +292,47 @@ object VolkvnServerSelector {
         val speedConfig = V2rayConfigManager.getV2rayConfig4Speedtest(context, guid)
         if (!speedConfig.status) return@withContext -1L
         V2RayNativeManager.initCoreEnv(context.applicationContext)
-        val primary = V2RayNativeManager.measureOutboundDelay(speedConfig.content, SettingsManager.getDelayTestUrl())
+        val primary = V2RayNativeManager.measureOutboundDelay(
+            speedConfig.content,
+            SettingsManager.getDelayTestUrlForConnect(),
+        )
         if (primary >= 0) return@withContext primary
-        V2RayNativeManager.measureOutboundDelay(speedConfig.content, SettingsManager.getDelayTestUrl(true))
+        V2RayNativeManager.measureOutboundDelay(
+            speedConfig.content,
+            SettingsManager.getDelayTestUrlForConnect(true),
+        )
+    }
+
+    private fun buildStratifiedUrlPool(
+        guids: List<String>,
+        cap: Int,
+        priorityFirst: Set<String>,
+    ): List<String> {
+        if (guids.isEmpty() || cap <= 0) return emptyList()
+        val bySub = guids.groupBy { MmkvManager.decodeServerConfig(it)?.subscriptionId.orEmpty() }
+        val queues = bySub.mapValues { (_, list) ->
+            list.sortedWith(
+                compareBy<String> { if (it in priorityFirst) 0 else 1 },
+            ).toMutableList()
+        }
+        val subOrder = queues.keys.sorted()
+        val picked = ArrayList<String>(cap.coerceAtMost(guids.size))
+        val used = HashSet<String>()
+        var progress = true
+        while (picked.size < cap && progress) {
+            progress = false
+            for (subId in subOrder) {
+                if (picked.size >= cap) break
+                val q = queues.getValue(subId)
+                while (q.isNotEmpty() && q.first() in used) q.removeAt(0)
+                val next = q.firstOrNull() ?: continue
+                q.removeAt(0)
+                picked += next
+                used += next
+                progress = true
+            }
+        }
+        return picked
     }
 
     private suspend fun urlTestGuids(context: Context, guids: List<String>): Map<String, Long> = coroutineScope {
@@ -250,13 +358,29 @@ object VolkvnServerSelector {
     suspend fun pickBestServer(context: Context, subscriptionId: String) {
         V2RayNativeManager.initCoreEnv(context.applicationContext)
         VolkvnBuiltinBootstrap.ensureBuiltinHelpers(context.applicationContext)
-
         val subKey = subscriptionId.ifBlank { AppConfig.VOLKVN_SUBSCRIPTION_ID }
-        val candidateGuids = resolveCandidateGuids(subKey).distinct()
+        val whitelistBuiltinOnly = MmkvManager.isActiveWhitelistRestrictedNetwork()
+        val candidateGuids = when (subKey) {
+            AppConfig.VOLKVN_SUBSCRIPTION_ID,
+            AppConfig.VOLKVN_BUILTIN_HELPERS_SUBSCRIPTION_ID,
+            -> VolkvnServerPoolBuilder.buildCandidateGuids(whitelistBuiltinOnly)
+            else -> resolveCandidateGuids(subKey).distinct()
+        }
         if (candidateGuids.isEmpty()) return
+        pickBestServerInternal(context, candidateGuids, whitelistBuiltinOnly, networkHandoff = false)
+    }
 
-        val publicGuidSet = MmkvManager.decodeServerList(AppConfig.VOLKVN_SUBSCRIPTION_ID).toSet()
-        val whitelistBuiltinGuids = VolkvnBuiltinBootstrap.whitelistOnlyStableGuids()
+    /**
+     * @return selected GUID or null if all probes failed
+     */
+    private suspend fun pickBestServerInternal(
+        context: Context,
+        candidateGuids: List<String>,
+        whitelistBuiltinOnly: Boolean,
+        networkHandoff: Boolean,
+    ): String? {
+        V2RayNativeManager.initCoreEnv(context.applicationContext)
+        val priorityFirst = VolkvnServerPoolBuilder.priorityFirstIds(whitelistBuiltinOnly)
 
         val eligible = candidateGuids.filterNot { isServerOnCooldown(it) }
         val pool = if (eligible.isNotEmpty()) eligible else candidateGuids
@@ -270,7 +394,8 @@ object VolkvnServerSelector {
                 "guidsTotal" to candidateGuids.size,
                 "eligibleNotCooldown" to eligible.size,
                 "usingEligiblePool" to eligible.isNotEmpty(),
-                "mergedVolKVN" to (subKey == AppConfig.VOLKVN_SUBSCRIPTION_ID || subKey == AppConfig.VOLKVN_BUILTIN_HELPERS_SUBSCRIPTION_ID),
+                "whitelistBuiltinOnly" to whitelistBuiltinOnly,
+                "networkHandoff" to networkHandoff,
             ),
         )
 
@@ -300,30 +425,27 @@ object VolkvnServerSelector {
         val tcpMap = HashMap<String, Long>()
         alive.forEach { tcpMap[it.guid] = it.latency }
 
+        val urlTestCap = if (networkHandoff) 12 else URL_TEST_CAP
         val preUrlSorted = pool.sortedWith(
-            compareBy<String> { if (it in whitelistBuiltinGuids) 0 else 1 }
+            compareBy<String> { if (it in priorityFirst) 0 else 1 }
                 .thenBy { tcpMap[it] ?: Long.MAX_VALUE },
         )
-        val baseUrlBatch = preUrlSorted.take(URL_TEST_CAP)
+        val baseUrlBatch = buildStratifiedUrlPool(preUrlSorted, urlTestCap, priorityFirst)
         val baseIds = baseUrlBatch.toSet()
         val extraTcpBatch = preUrlSorted
             .asSequence()
             .filter { it !in baseIds && (tcpMap[it] ?: Long.MAX_VALUE) < Long.MAX_VALUE }
-            .take(URL_TEST_EXTRA_TCP)
+            .take(if (networkHandoff) 4 else URL_TEST_EXTRA_TCP)
             .toList()
         val urlCandidates = (baseUrlBatch + extraTcpBatch).distinct()
         val urlDelays = urlTestGuids(context, urlCandidates).toMutableMap()
 
         val missing = urlCandidates
             .filter { it !in urlDelays.keys }
-            .take(URL_TEST_SUPPLEMENT_CAP)
+            .take(if (networkHandoff) 6 else URL_TEST_SUPPLEMENT_CAP)
         if (missing.isNotEmpty()) {
             urlDelays.putAll(urlTestGuids(context, missing))
         }
-
-        val publicUrlOk = publicGuidSet.any { g -> (urlDelays[g] ?: -1L) >= 0L }
-        val priorityFirst =
-            if (!publicUrlOk && whitelistBuiltinGuids.isNotEmpty()) whitelistBuiltinGuids else emptySet()
 
         urlDelays.forEach { (g, d) ->
             if (d >= 0L) {
@@ -340,13 +462,19 @@ object VolkvnServerSelector {
                 .thenBy { candidateGuids.indexOf(it) },
         )
 
+        if (alive.isEmpty() && urlDelays.isEmpty()) {
+            Log.w(TAG, "All TCP and URL probes failed count=${candidateGuids.size} wl=$whitelistBuiltinOnly")
+            VolkvnDebugLog.simpleModeLog("22", "prepare_all_probes_dead")
+            return null
+        }
+
         val pick = when {
             alive.isEmpty() -> {
                 val validGuids = candidateGuids.filter { gid ->
                     val p = MmkvManager.decodeServerConfig(gid)
                     p != null && p.configType != EConfigType.CUSTOM && p.configType != EConfigType.POLICYGROUP
                 }
-                if (validGuids.isEmpty()) return
+                if (validGuids.isEmpty()) return null
                 val guid = validGuids.random()
                 val p = MmkvManager.decodeServerConfig(guid)!!
                 Log.w(TAG, "No TCP probe succeeded; fallback random guid=$guid (${p.remarks})")
@@ -381,6 +509,7 @@ object VolkvnServerSelector {
                 "queueSize" to ranked.size,
             ),
         )
+        return pick
     }
 
 }

@@ -44,10 +44,13 @@ object VolkvnVpnBootstrap {
             // #endregion
             return false
         }
-        val primary = V2RayNativeManager.measureOutboundDelay(speedConfig.content, SettingsManager.getDelayTestUrl())
+        val primary = V2RayNativeManager.measureOutboundDelay(
+            speedConfig.content,
+            SettingsManager.getDelayTestUrlForConnect(),
+        )
         val fallback = if (primary >= 0) primary else V2RayNativeManager.measureOutboundDelay(
             speedConfig.content,
-            SettingsManager.getDelayTestUrl(true),
+            SettingsManager.getDelayTestUrlForConnect(true),
         )
         val delay = max(primary, fallback)
         // #region agent log
@@ -80,8 +83,13 @@ object VolkvnVpnBootstrap {
      * - [pickBestServer] runs when selection is blank or no longer in the imported pool; dead nodes
      *   are still handled via [VolkvnServerSelector.markServerUnhealthy], watchdog, and auto-recover.
      */
-    suspend fun refreshServersAndSelectBest(context: Context) = refreshMutex.withLock {
+    suspend fun refreshServersAndSelectBest(context: Context, skipPickIfRecent: Boolean = false) = refreshMutex.withLock {
         withContext(Dispatchers.IO) {
+            val reach = VolkvnSimpleModeNetwork.probeAndApply(context, fast = true)
+            if (!reach.hasInternet) {
+                VolkvnDebugLog.log(context, TAG, "refresh: skip no internet")
+                return@withContext
+            }
             val nowWall = System.currentTimeMillis()
             val lastWall = MmkvManager.decodeSettingsLong(AppConfig.PREF_VOLKVN_LAST_POOL_REFRESH_AT, 0L)
             val deltaMs = if (lastWall > 0L) nowWall - lastWall else -1L
@@ -116,9 +124,13 @@ object VolkvnVpnBootstrap {
             ensurePublicPoolSubscription(context)
             VolkvnBuiltinBootstrap.ensureBuiltinHelpers(context)
             val merged = StringBuilder()
+            val wlRestricted = MmkvManager.isActiveWhitelistRestrictedNetwork()
+            val vpnUp = Utils.isVpnTransportActive(context.applicationContext)
             for (raw in allPoolSourceUrls(context)) {
                 val url = HttpUtil.toIdnUrl(raw.trim())
-                val body = HttpUtil.getUrlContent(url, 30000) ?: continue
+                val fetchLink = VolkvnWhitelistSubscriptionFetch.resolveFetchLink(raw.trim(), wlRestricted, vpnUp)
+                val rawBody = HttpUtil.getUrlContent(fetchLink, 30000) ?: continue
+                val body = VolkvnWhitelistSubscriptionFetch.extractSubscriptionBody(rawBody)
                 val lines = body.count { it == '\n' } + 1
                 Log.i(TAG, "Pool URL fetched: $lines lines, ${body.length} bytes -> $url")
                 merged.appendLine(body)
@@ -151,7 +163,6 @@ object VolkvnVpnBootstrap {
             val selected = MmkvManager.getSelectServer()
             val guids = MmkvManager.decodeServerList(subId)
             val mergedPoolGuids = VolkvnBuiltinBootstrap.mergePublicAndBuiltinGuids().toSet()
-            val vpnUp = Utils.isVpnTransportActive(context.applicationContext)
             val selectedInPool = selected != null && selected in mergedPoolGuids
             val selectedHealthyWhenDown =
                 if (!vpnUp && selectedInPool) VolkvnServerSelector.isServerTcpHealthy(context, selected, attempts = 2) else true
@@ -161,7 +172,9 @@ object VolkvnVpnBootstrap {
                 } else {
                     true
                 }
-            val needPick = selected.isNullOrBlank() || !selectedInPool || !selectedHealthyWhenDown || !selectedRealHealthyWhenDown
+            val needPick = !skipPickIfRecent && (
+                selected.isNullOrBlank() || !selectedInPool || !selectedHealthyWhenDown || !selectedRealHealthyWhenDown
+                )
             // #region agent log
             VolkvnAgentDebug.emit(
                 context,
@@ -188,38 +201,38 @@ object VolkvnVpnBootstrap {
                         "refresh:selected_failed_health tcp=$selectedHealthyWhenDown real=$selectedRealHealthyWhenDown",
                     )
                 }
-                VolkvnServerSelector.pickBestServer(context, subId)
-                val picked = MmkvManager.getSelectServer()
-                if (!vpnUp && !picked.isNullOrBlank()) {
-                    val pickedRealHealthy = checkSelectedRealHealthy(context, picked, "H21")
-                    if (!pickedRealHealthy) {
-                        VolkvnServerSelector.markServerUnhealthy(picked, "refresh:post_pick_real_ping_failed")
-                        VolkvnServerSelector.pickBestServer(context, subId)
-                        // #region agent log
-                        VolkvnAgentDebug.emit(
-                            context,
-                            hypothesisId = "H21",
-                            location = "VolkvnVpnBootstrap.kt:afterPickBest",
-                            message = "repick_after_failed_real_ping",
-                            data = mapOf(
-                                "firstPickGuidLen" to picked.length,
-                                "finalPickGuidLen" to (MmkvManager.getSelectServer()?.length ?: 0),
-                            ),
-                        )
-                        // #endregion
+                SimpleModeStatusStore.setFromStringRes(context, R.string.volkvn_status_testing_servers)
+                when (val prep = VolkvnServerSelector.prepareForConnect(context)) {
+                    is PrepareForConnectResult.Success -> {
+                        MmkvManager.setSelectServer(prep.guid)
+                        if (!vpnUp) {
+                            val pickedRealHealthy = checkSelectedRealHealthy(context, prep.guid, "H21")
+                            if (!pickedRealHealthy) {
+                                VolkvnServerSelector.markServerUnhealthy(prep.guid, "refresh:post_pick_real_ping_failed")
+                                when (val reprep = VolkvnServerSelector.prepareForConnect(context)) {
+                                    is PrepareForConnectResult.Success ->
+                                        MmkvManager.setSelectServer(reprep.guid)
+                                    else -> Unit
+                                }
+                            }
+                        }
                     }
+                    PrepareForConnectResult.NoProfiles ->
+                        VolkvnDebugLog.log(context, TAG, "refresh: prepareForConnect no profiles")
+                    PrepareForConnectResult.AllProbesDead ->
+                        VolkvnDebugLog.log(context, TAG, "refresh: prepareForConnect all probes dead")
                 }
                 VolkvnDebugLog.log(
                     context,
                     TAG,
-                    "refresh: pickBestServer (vpnUp=$vpnUp blank=${selected.isNullOrBlank()} missing=${!selectedInPool} selectedHealthyWhenDown=$selectedHealthyWhenDown selectedRealHealthyWhenDown=$selectedRealHealthyWhenDown)",
+                    "refresh: prepareForConnect (vpnUp=$vpnUp blank=${selected.isNullOrBlank()} missing=${!selectedInPool})",
                 )
                 // #region agent log
                 VolkvnAgentDebug.emit(
                     context,
                     hypothesisId = "H5",
-                    location = "VolkvnVpnBootstrap.kt:afterPickBest",
-                    message = "selected_after_pick",
+                    location = "VolkvnVpnBootstrap.kt:afterPrepare",
+                    message = "selected_after_prepare",
                     data = mapOf(
                         "guid" to (MmkvManager.getSelectServer() ?: ""),
                     ),

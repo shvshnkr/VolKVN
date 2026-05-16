@@ -58,6 +58,19 @@ object AppConfig {
     const val PREF_AUTO_SELECT_FALLBACK_QUEUE = "pref_auto_select_fallback_queue"
     const val PREF_AUTO_SELECT_FALLBACK_INDEX = "pref_auto_select_fallback_index"
     const val PREF_AUTO_SELECT_LAST_KNOWN_GOOD = "pref_auto_select_last_known_good"
+    const val PREF_SIMPLE_MODE_USE_WHITELIST_BUILTIN_POOL_ONLY = "pref_simple_mode_use_whitelist_builtin_pool_only"
+    const val PREF_ACTIVE_WHITELIST_RESTRICTED_NETWORK = "pref_active_whitelist_restricted_network"
+    const val PREF_AUTO_CONNECT_PAUSED_UNTIL_GOOGLE = "pref_auto_connect_paused_until_google"
+    const val PREF_AUTO_SELECT_LAST_FULL_PROBE_AT = "pref_auto_select_last_full_probe_at"
+    const val PREF_AUTO_SELECT_PROXY_ID_SET_HASH = "pref_auto_select_proxy_id_set_hash"
+    const val PREF_AUTO_SELECT_LAST_PROBE_WHITELIST_ONLY = "pref_auto_select_last_probe_whitelist_only"
+    const val PREF_AUTO_SELECT_LAST_KNOWN_GOOD_URL_AT = "pref_auto_select_last_known_good_url_at"
+    const val PREF_AUTO_SELECT_LAST_KNOWN_GOOD_URL_PROFILE = "pref_auto_select_last_known_good_url_profile"
+    const val PREF_VPN_EXIT_PROBE_PROFILE_ID = "pref_vpn_exit_probe_profile_id"
+    const val PREF_VPN_EXIT_IS_RUSSIA = "pref_vpn_exit_is_russia"
+    const val PREF_VOLKVN_DEFAULT_SUBS_BOOTSTRAPPED = "pref_volkvn_default_subs_bootstrapped"
+    /** Delay test when Google is blocked (whitelist-only network). */
+    const val DELAY_TEST_URL_WL = "https://ya.ru"
 
     /**
      * Built-in public pool sources (always included). User-added URLs live in [PREF_VOLKVN_USER_POOL_URLS].

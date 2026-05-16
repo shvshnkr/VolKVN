@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.text.TextUtils
 import android.util.Log
+import com.v2ray.ang.AngApplication
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.HY2
 import com.v2ray.ang.R
@@ -530,19 +531,22 @@ object AngConfigManager {
                     return SubscriptionUpdateResult(failureCount = 1)
                 }
             }
-            Log.i(AppConfig.TAG, url)
+            val wlRestricted = MmkvManager.isActiveWhitelistRestrictedNetwork()
+            val vpnUp = Utils.isVpnTransportActive(AngApplication.application)
+            val fetchUrl = VolkvnWhitelistSubscriptionFetch.resolveFetchLink(url, wlRestricted, vpnUp)
+            Log.i(AppConfig.TAG, fetchUrl)
             val userAgent = it.subscription.userAgent
 
             var configText = try {
                 val httpPort = SettingsManager.getHttpPort()
-                HttpUtil.getUrlContentWithUserAgent(url, userAgent, 15000, httpPort)
+                HttpUtil.getUrlContentWithUserAgent(fetchUrl, userAgent, 15000, httpPort)
             } catch (e: Exception) {
                 Log.e(AppConfig.ANG_PACKAGE, "Update subscription: proxy not ready or other error", e)
                 ""
             }
             if (configText.isEmpty()) {
                 configText = try {
-                    HttpUtil.getUrlContentWithUserAgent(url, userAgent)
+                    HttpUtil.getUrlContentWithUserAgent(fetchUrl, userAgent)
                 } catch (e: Exception) {
                     Log.e(AppConfig.TAG, "Update subscription: Failed to get URL content with user agent", e)
                     ""
@@ -551,6 +555,7 @@ object AngConfigManager {
             if (configText.isEmpty()) {
                 return SubscriptionUpdateResult(failureCount = 1)
             }
+            configText = VolkvnWhitelistSubscriptionFetch.extractSubscriptionBody(configText)
 
             val count = parseConfigViaSub(configText, it.guid, false)
             if (count > 0) {

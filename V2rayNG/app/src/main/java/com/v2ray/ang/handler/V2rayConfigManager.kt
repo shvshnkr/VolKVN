@@ -652,7 +652,15 @@ object V2rayConfigManager {
                 return
             }
 
-            val rule = JsonUtil.fromJson(JsonUtil.toJson(item), RulesBean::class.java) ?: return
+            val selectedGuid = MmkvManager.getSelectServer()
+            val routeRuViaProxy = VolkvnWhitelistRuRouting.shouldRouteRuGeoViaProxy(selectedGuid)
+            val effectiveItem = if (routeRuViaProxy && VolkvnWhitelistRuRouting.isRuGeoDirectBypassRule(item)) {
+                item.copy(outboundTag = AppConfig.TAG_PROXY)
+            } else {
+                item
+            }
+
+            val rule = JsonUtil.fromJson(JsonUtil.toJson(effectiveItem), RulesBean::class.java) ?: return
 
             // Replace specific geoip rules with ext versions
             rule.ip?.let { ipList ->

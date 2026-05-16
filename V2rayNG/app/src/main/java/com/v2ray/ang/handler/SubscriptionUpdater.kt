@@ -36,6 +36,11 @@ object SubscriptionUpdater {
         override suspend fun doWork(): Result {
             Log.i(AppConfig.TAG, "subscription automatic update starting")
 
+            if (!NetworkReachabilityProbe.probe(applicationContext, fast = true).hasInternet) {
+                Log.i(AppConfig.TAG, "subscription automatic update skipped: no internet")
+                return Result.success()
+            }
+
             val subs = MmkvManager.decodeSubscriptions().filter { it.subscription.autoUpdate }
 
             for (sub in subs) {

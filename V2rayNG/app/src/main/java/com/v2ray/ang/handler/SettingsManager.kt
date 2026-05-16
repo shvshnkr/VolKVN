@@ -390,6 +390,14 @@ object SettingsManager {
         }
     }
 
+    /** URL-test target for connect / auto-select; uses ya.ru on whitelist-only networks. */
+    fun getDelayTestUrlForConnect(second: Boolean = false): String {
+        if (MmkvManager.isActiveWhitelistRestrictedNetwork()) {
+            return if (second) AppConfig.DELAY_TEST_URL2 else AppConfig.DELAY_TEST_URL_WL
+        }
+        return getDelayTestUrl(second)
+    }
+
     /**
      * Get the locale.
      * @return The locale.

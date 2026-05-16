@@ -30,7 +30,10 @@ import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SpeedtestManager
 import com.v2ray.ang.handler.V2RayServiceManager
 import com.v2ray.ang.handler.VolkvnAgentDebug
+import com.v2ray.ang.handler.VolkvnBuiltinBootstrap
 import com.v2ray.ang.handler.VolkvnServerSelector
+import com.v2ray.ang.handler.PrepareForConnectResult
+import com.v2ray.ang.handler.VolkvnSimpleModeConnectOrchestrator
 import com.v2ray.ang.util.MessageUtil
 import com.v2ray.ang.util.Utils
 import kotlinx.coroutines.CoroutineScope
@@ -150,7 +153,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 VolkvnServerSelector.markServerUnhealthy(selectedGuid, "autoRecover:$reason")
                 val moved = VolkvnServerSelector.tryMoveToFallback(selectedGuid)
                 if (moved == null) {
-                    VolkvnServerSelector.pickBestServer(app, targetSubId)
+                    val usePrepare = targetSubId == AppConfig.VOLKVN_SUBSCRIPTION_ID ||
+                        targetSubId == AppConfig.VOLKVN_BUILTIN_HELPERS_SUBSCRIPTION_ID
+                    if (usePrepare) {
+                        when (val prep = VolkvnServerSelector.prepareForConnect(app)) {
+                            is PrepareForConnectResult.Success ->
+                                MmkvManager.setSelectServer(prep.guid)
+                            else -> Unit
+                        }
+                    } else {
+                        VolkvnServerSelector.pickBestServer(app, targetSubId)
+                    }
                 }
                 withContext(Dispatchers.Main) {
                     V2RayServiceManager.stopVService(app)
@@ -559,7 +572,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     getApplication<AngApplication>().toastSuccess(R.string.toast_services_success)
                     isRunning.value = true
                     VolkvnDebugLog.log(getApplication(), "MainVM", "broadcast START_SUCCESS")
-                    MmkvManager.getSelectServer()?.let { VolkvnServerSelector.markConnected(it) }
+                    val app = getApplication<AngApplication>()
+                    val guid = MmkvManager.getSelectServer()
+                    val volkvnPool = guid != null &&
+                        guid in VolkvnBuiltinBootstrap.mergePublicAndBuiltinGuids()
+                    viewModelScope.launch(Dispatchers.IO) {
+                        if (volkvnPool) {
+                            VolkvnSimpleModeConnectOrchestrator.verifyAfterStart(app)
+                        } else {
+                            guid?.let { VolkvnServerSelector.markConnected(it) }
+                        }
+                    }
                 }
 
                 AppConfig.MSG_STATE_START_FAILURE -> {

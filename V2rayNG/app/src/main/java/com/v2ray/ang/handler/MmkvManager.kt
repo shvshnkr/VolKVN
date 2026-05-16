@@ -9,7 +9,18 @@ import com.v2ray.ang.AppConfig.PREF_VOLKVN_LAST_POOL_REFRESH_AT
 import com.v2ray.ang.AppConfig.PREF_VOLKVN_USER_POOL_URLS
 import com.v2ray.ang.AppConfig.PREF_AUTO_SELECT_FALLBACK_INDEX
 import com.v2ray.ang.AppConfig.PREF_AUTO_SELECT_FALLBACK_QUEUE
+import com.v2ray.ang.AppConfig.PREF_ACTIVE_WHITELIST_RESTRICTED_NETWORK
+import com.v2ray.ang.AppConfig.PREF_AUTO_CONNECT_PAUSED_UNTIL_GOOGLE
+import com.v2ray.ang.AppConfig.PREF_AUTO_SELECT_LAST_FULL_PROBE_AT
 import com.v2ray.ang.AppConfig.PREF_AUTO_SELECT_LAST_KNOWN_GOOD
+import com.v2ray.ang.AppConfig.PREF_AUTO_SELECT_LAST_KNOWN_GOOD_URL_AT
+import com.v2ray.ang.AppConfig.PREF_AUTO_SELECT_LAST_KNOWN_GOOD_URL_PROFILE
+import com.v2ray.ang.AppConfig.PREF_AUTO_SELECT_LAST_PROBE_WHITELIST_ONLY
+import com.v2ray.ang.AppConfig.PREF_AUTO_SELECT_PROXY_ID_SET_HASH
+import com.v2ray.ang.AppConfig.PREF_SIMPLE_MODE_USE_WHITELIST_BUILTIN_POOL_ONLY
+import com.v2ray.ang.AppConfig.PREF_VPN_EXIT_IS_RUSSIA
+import com.v2ray.ang.AppConfig.PREF_VPN_EXIT_PROBE_PROFILE_ID
+import com.v2ray.ang.AppConfig.PREF_VOLKVN_DEFAULT_SUBS_BOOTSTRAPPED
 import com.v2ray.ang.AppConfig.VOLKVN_SUBSCRIPTION_ID
 import com.v2ray.ang.dto.AssetUrlCache
 import com.v2ray.ang.dto.AssetUrlItem
@@ -745,6 +756,103 @@ object MmkvManager {
         } else {
             encodeSettings(PREF_AUTO_SELECT_LAST_KNOWN_GOOD, guid)
         }
+    }
+
+    fun getSimpleModeUseWhitelistBuiltinPoolOnly(): Boolean =
+        decodeSettingsBool(PREF_SIMPLE_MODE_USE_WHITELIST_BUILTIN_POOL_ONLY, false)
+
+    fun setSimpleModeUseWhitelistBuiltinPoolOnly(value: Boolean) {
+        encodeSettings(PREF_SIMPLE_MODE_USE_WHITELIST_BUILTIN_POOL_ONLY, value)
+    }
+
+    fun clearSimpleModeUseWhitelistBuiltinPoolOnly() {
+        settingsStorage.remove(PREF_SIMPLE_MODE_USE_WHITELIST_BUILTIN_POOL_ONLY)
+    }
+
+    fun isActiveWhitelistRestrictedNetwork(): Boolean =
+        decodeSettingsBool(PREF_ACTIVE_WHITELIST_RESTRICTED_NETWORK, false)
+
+    fun setActiveWhitelistRestrictedNetwork(value: Boolean) {
+        encodeSettings(PREF_ACTIVE_WHITELIST_RESTRICTED_NETWORK, value)
+    }
+
+    fun isAutoConnectPausedUntilGoogle(): Boolean =
+        decodeSettingsBool(PREF_AUTO_CONNECT_PAUSED_UNTIL_GOOGLE, false)
+
+    fun setAutoConnectPausedUntilGoogle(value: Boolean) {
+        encodeSettings(PREF_AUTO_CONNECT_PAUSED_UNTIL_GOOGLE, value)
+    }
+
+    fun getAutoSelectLastFullProbeAt(): Long =
+        decodeSettingsLong(PREF_AUTO_SELECT_LAST_FULL_PROBE_AT, 0L)
+
+    fun setAutoSelectLastFullProbeAt(ms: Long) {
+        encodeSettings(PREF_AUTO_SELECT_LAST_FULL_PROBE_AT, ms)
+    }
+
+    fun getAutoSelectProxyIdSetHash(): Long =
+        decodeSettingsLong(PREF_AUTO_SELECT_PROXY_ID_SET_HASH, 0L)
+
+    fun setAutoSelectProxyIdSetHash(hash: Long) {
+        encodeSettings(PREF_AUTO_SELECT_PROXY_ID_SET_HASH, hash)
+    }
+
+    fun wasAutoSelectLastProbeWhitelistOnly(): Boolean =
+        decodeSettingsBool(PREF_AUTO_SELECT_LAST_PROBE_WHITELIST_ONLY, false)
+
+    fun setAutoSelectLastProbeWhitelistOnly(value: Boolean) {
+        encodeSettings(PREF_AUTO_SELECT_LAST_PROBE_WHITELIST_ONLY, value)
+    }
+
+    fun getAutoSelectLastKnownGoodUrlAt(): Long =
+        decodeSettingsLong(PREF_AUTO_SELECT_LAST_KNOWN_GOOD_URL_AT, 0L)
+
+    fun setAutoSelectLastKnownGoodUrlAt(ms: Long) {
+        encodeSettings(PREF_AUTO_SELECT_LAST_KNOWN_GOOD_URL_AT, ms)
+    }
+
+    fun getAutoSelectLastKnownGoodUrlProfile(): String? =
+        decodeSettingsString(PREF_AUTO_SELECT_LAST_KNOWN_GOOD_URL_PROFILE)
+
+    fun setAutoSelectLastKnownGoodUrlProfile(guid: String?) {
+        if (guid.isNullOrBlank()) {
+            settingsStorage.remove(PREF_AUTO_SELECT_LAST_KNOWN_GOOD_URL_PROFILE)
+        } else {
+            encodeSettings(PREF_AUTO_SELECT_LAST_KNOWN_GOOD_URL_PROFILE, guid)
+        }
+    }
+
+    fun getVpnExitProbeProfileId(): String? =
+        decodeSettingsString(PREF_VPN_EXIT_PROBE_PROFILE_ID)
+
+    fun setVpnExitProbeProfileId(guid: String?) {
+        if (guid.isNullOrBlank()) {
+            settingsStorage.remove(PREF_VPN_EXIT_PROBE_PROFILE_ID)
+        } else {
+            encodeSettings(PREF_VPN_EXIT_PROBE_PROFILE_ID, guid)
+        }
+    }
+
+    /** null = unknown, true/false = last probe result */
+    fun getVpnExitIsRussia(): Boolean? = when (decodeSettingsString(PREF_VPN_EXIT_IS_RUSSIA)) {
+        "true" -> true
+        "false" -> false
+        else -> null
+    }
+
+    fun setVpnExitIsRussia(value: Boolean?) {
+        if (value == null) {
+            settingsStorage.remove(PREF_VPN_EXIT_IS_RUSSIA)
+        } else {
+            encodeSettings(PREF_VPN_EXIT_IS_RUSSIA, if (value) "true" else "false")
+        }
+    }
+
+    fun isVolkvnDefaultSubsBootstrapped(): Boolean =
+        decodeSettingsBool(PREF_VOLKVN_DEFAULT_SUBS_BOOTSTRAPPED, false)
+
+    fun setVolkvnDefaultSubsBootstrapped(value: Boolean) {
+        encodeSettings(PREF_VOLKVN_DEFAULT_SUBS_BOOTSTRAPPED, value)
     }
 
     //endregion

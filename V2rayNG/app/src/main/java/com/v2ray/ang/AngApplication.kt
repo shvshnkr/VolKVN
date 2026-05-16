@@ -7,7 +7,12 @@ import androidx.work.WorkManager
 import com.tencent.mmkv.MMKV
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
+import com.v2ray.ang.handler.VolkvnDefaultUserBootstrap
 import com.v2ray.ang.handler.VolkvnVpnBootstrap
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class AngApplication : MultiDexApplication() {
     companion object {
@@ -43,6 +48,9 @@ class AngApplication : MultiDexApplication() {
         SettingsManager.initApp(this)
         SettingsManager.setNightMode()
         VolkvnVpnBootstrap.schedulePublicPoolWorker()
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            VolkvnDefaultUserBootstrap.bootstrapAll(this@AngApplication)
+        }
 
         es.dmoral.toasty.Toasty.Config.getInstance()
             .setGravity(android.view.Gravity.BOTTOM, 0, 300)

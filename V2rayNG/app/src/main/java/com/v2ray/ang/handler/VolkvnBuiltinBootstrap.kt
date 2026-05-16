@@ -30,11 +30,37 @@ object VolkvnBuiltinBootstrap {
 
     fun stableGuidOrder(): List<String> = STABLE_GUIDS.toList()
 
-    /** First four helpers — prioritized when the public pool has no URL-test success. */
-    fun whitelistOnlyStableGuids(): Set<String> =
-        VolkvnBuiltinProxies.definitions.mapIndexedNotNull { index, def ->
+    /** Built-in Trojan + WL vless profiles used on whitelist-only networks. */
+    fun whitelistOnlyStableGuids(): Set<String> {
+        val trojan = VolkvnBuiltinProxies.definitions.mapIndexedNotNull { index, def ->
             if (def.useInWhitelistOnlyPool) STABLE_GUIDS[index] else null
-        }.toSet()
+        }
+        val vless = MmkvManager.decodeServerList(AppConfig.VOLKVN_BUILTIN_HELPERS_SUBSCRIPTION_ID)
+            .filter { guid ->
+                MmkvManager.decodeServerConfig(guid)?.remarks
+                    ?.startsWith(VolkvnBuiltinVlessShareLines.WL_VLESS_NAME_PREFIX) == true
+            }
+        return (trojan + vless).toSet()
+    }
+
+    private fun syncWhitelistBuiltinVless() {
+        val text = VolkvnBuiltinVlessShareLines.lines.joinToString("\n")
+        if (text.isBlank()) return
+        AngConfigManager.importBatchConfig(text, AppConfig.VOLKVN_BUILTIN_HELPERS_SUBSCRIPTION_ID, append = true)
+        VolkvnBuiltinVlessShareLines.lines.forEachIndexed { index, _ ->
+            val stableName = VolkvnBuiltinVlessShareLines.WL_VLESS_NAME_PREFIX + "%02d".format(index + 1)
+            val guid = MmkvManager.decodeServerList(AppConfig.VOLKVN_BUILTIN_HELPERS_SUBSCRIPTION_ID)
+                .firstOrNull { MmkvManager.decodeServerConfig(it)?.remarks == stableName }
+            if (guid != null) {
+                val p = MmkvManager.decodeServerConfig(guid) ?: return@forEachIndexed
+                if (p.remarks != stableName) {
+                    p.remarks = stableName
+                    MmkvManager.encodeServerConfig(guid, p)
+                }
+            }
+        }
+        VolkvnDebugLog.simpleModeLog("24", "builtin_vless_sync count=${VolkvnBuiltinVlessShareLines.lines.size}")
+    }
 
     /**
      * Public pool GUIDs plus built-in helpers (unique, builtins first in stable order).
@@ -54,6 +80,8 @@ object VolkvnBuiltinBootstrap {
             autoUpdate = false,
         )
         MmkvManager.encodeSubscription(AppConfig.VOLKVN_BUILTIN_HELPERS_SUBSCRIPTION_ID, item)
+
+        syncWhitelistBuiltinVless()
 
         VolkvnBuiltinProxies.definitions.forEachIndexed { index, def ->
             val guid = STABLE_GUIDS[index]

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.core.content.FileProvider
+import com.v2ray.ang.AngApplication
 import com.v2ray.ang.BuildConfig
 import java.io.File
 import java.text.SimpleDateFormat
@@ -26,6 +27,10 @@ object VolkvnDebugLog {
 
     @Volatile
     private var sessionHeaderWritten = false
+
+    fun simpleModeLog(hypothesisId: String, message: String) {
+        log(AngApplication.application, "SimpleMode", "H$hypothesisId $message")
+    }
 
     fun log(context: Context, tag: String, message: String) {
         val line = "${tsFormat.format(Date())} [$tag] $message\n"

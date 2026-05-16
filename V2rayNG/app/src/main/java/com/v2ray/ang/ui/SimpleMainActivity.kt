@@ -16,14 +16,19 @@ import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivitySimpleMainBinding
 import com.v2ray.ang.enums.PermissionType
 import com.v2ray.ang.extension.toast
+import com.v2ray.ang.handler.SimpleModeStatusStore
 import com.v2ray.ang.handler.VolkvnAgentDebug
 import com.v2ray.ang.handler.VolkvnDebugLog
+import com.v2ray.ang.handler.VolkvnDefaultUserBootstrap
+import com.v2ray.ang.handler.VolkvnSimpleModeConnectOrchestrator
+import com.v2ray.ang.handler.VolkvnSimpleModeNetwork
 import com.v2ray.ang.handler.VolkvnVpnBootstrap
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.V2RayServiceManager
 import com.v2ray.ang.util.Utils
 import com.v2ray.ang.viewmodel.MainViewModel
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
@@ -73,10 +78,25 @@ class SimpleMainActivity : HelperBaseActivity() {
             binding.switchConnect.setOnCheckedChangeListener { _, isChecked ->
                 onConnectSwitch(isChecked)
             }
-            binding.tvStatus.text = if (running) {
-                getString(R.string.volkvn_simple_status_on)
-            } else {
-                getString(R.string.volkvn_simple_status_off)
+            if (running) {
+                val activity = SimpleModeStatusStore.status.value
+                binding.tvStatus.text = activity.ifBlank {
+                    getString(R.string.volkvn_simple_status_on)
+                }
+            } else if (SimpleModeStatusStore.status.value.isBlank()) {
+                binding.tvStatus.text = getString(R.string.volkvn_simple_status_off)
+            }
+        }
+
+        lifecycleScope.launch {
+            SimpleModeStatusStore.status.collectLatest { line ->
+                if (mainViewModel.isRunning.value == true) {
+                    binding.tvStatus.text = line.ifBlank {
+                        getString(R.string.volkvn_simple_status_on)
+                    }
+                } else if (line.isNotBlank()) {
+                    binding.tvStatus.text = line
+                }
             }
         }
 
@@ -98,8 +118,11 @@ class SimpleMainActivity : HelperBaseActivity() {
         }
 
         lifecycleScope.launch {
-            binding.tvStatus.text = getString(R.string.volkvn_simple_status_refreshing)
+            VolkvnDefaultUserBootstrap.bootstrapAll(this@SimpleMainActivity)
+            VolkvnSimpleModeNetwork.probeAndApply(this@SimpleMainActivity)
+            SimpleModeStatusStore.setFromStringRes(this@SimpleMainActivity, R.string.volkvn_status_refreshing_subs)
             VolkvnVpnBootstrap.refreshServersAndSelectBest(this@SimpleMainActivity)
+            SimpleModeStatusStore.clearActivity()
             binding.tvStatus.text = if (MmkvManager.getSelectServer().isNullOrBlank()) {
                 getString(R.string.volkvn_simple_status_no_servers)
             } else {
@@ -234,18 +257,6 @@ class SimpleMainActivity : HelperBaseActivity() {
     private fun startV2RayWithPreflight() {
         lifecycleScope.launch {
             if (preconnectRefreshInProgress) {
-                VolkvnDebugLog.log(this@SimpleMainActivity, "SimpleMain", "preconnect refresh: skip in progress")
-                // #region agent log
-                VolkvnAgentDebug.emit(
-                    this@SimpleMainActivity,
-                    hypothesisId = "H44",
-                    location = "SimpleMainActivity.kt:startV2RayWithPreflight",
-                    message = "preconnect_refresh_in_progress_start_immediately",
-                    data = mapOf(
-                        "selectedGuidLen" to (MmkvManager.getSelectServer()?.length ?: 0),
-                    ),
-                )
-                // #endregion
                 V2RayServiceManager.startVService(this@SimpleMainActivity)
                 return@launch
             }
@@ -255,23 +266,6 @@ class SimpleMainActivity : HelperBaseActivity() {
             val needRefresh = now - lastGlobalPoolRefreshAt >= PRECONNECT_REFRESH_MIN_INTERVAL_MS
             if (needRefresh) {
                 preconnectRefreshInProgress = true
-                binding.tvStatus.text = getString(R.string.volkvn_simple_status_refreshing)
-                VolkvnDebugLog.log(this@SimpleMainActivity, "SimpleMain", "preconnect refresh: start")
-                // #region agent log
-                VolkvnAgentDebug.emit(
-                    this@SimpleMainActivity,
-                    hypothesisId = "H5",
-                    location = "SimpleMainActivity.kt:startV2RayWithPreflight",
-                    message = "before_preconnect_refresh",
-                    data = mapOf(
-                        "selectedGuid" to (MmkvManager.getSelectServer() ?: ""),
-                        "selectedGuidLen" to (MmkvManager.getSelectServer()?.length ?: 0),
-                        "lastGlobalPoolRefreshAt" to lastGlobalPoolRefreshAt,
-                        "msSinceGlobalPoolRefresh" to (now - lastGlobalPoolRefreshAt),
-                        "needRefresh" to needRefresh,
-                    ),
-                )
-                // #endregion
                 runCatching {
                     VolkvnVpnBootstrap.refreshServersAndSelectBest(this@SimpleMainActivity)
                 }.onFailure {
@@ -283,22 +277,12 @@ class SimpleMainActivity : HelperBaseActivity() {
                 }
                 preconnectRefreshInProgress = false
             }
-            // #region agent log
-            VolkvnAgentDebug.emit(
-                this@SimpleMainActivity,
-                hypothesisId = "H5",
-                location = "SimpleMainActivity.kt:beforeStartVService",
-                message = "about_to_start_vservice",
-                data = mapOf(
-                    "selectedGuid" to (MmkvManager.getSelectServer() ?: ""),
-                    "selectedGuidLen" to (MmkvManager.getSelectServer()?.length ?: 0),
-                    "lastGlobalPoolRefreshAt" to lastGlobalPoolRefreshAt,
-                    "msSinceGlobalPoolRefresh" to (now - lastGlobalPoolRefreshAt),
-                    "skippedRefreshDueToInterval" to !needRefresh,
-                ),
-            )
-            // #endregion
-            V2RayServiceManager.startVService(this@SimpleMainActivity)
+            val started = VolkvnSimpleModeConnectOrchestrator.connect(this@SimpleMainActivity) {
+                V2RayServiceManager.startVService(this@SimpleMainActivity)
+            }
+            if (!started) {
+                binding.switchConnect.isChecked = false
+            }
         }
     }
 
