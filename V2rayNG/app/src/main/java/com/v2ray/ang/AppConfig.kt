@@ -207,6 +207,8 @@ object AppConfig {
     const val MSG_STATE_STOP_SUCCESS = 41
     const val MSG_STATE_RESTART = 5
     const val MSG_MEASURE_DELAY = 6
+    /** Simple-mode post-connect verify (exit probe + URL test); must run in :RunSoLibV2RayDaemon. */
+    const val MSG_VOLKVVN_SIMPLE_VERIFY = 8
     const val MSG_MEASURE_DELAY_SUCCESS = 61
     const val MSG_MEASURE_CONFIG = 7
     const val MSG_MEASURE_CONFIG_SUCCESS = 71

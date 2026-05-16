@@ -208,15 +208,19 @@ object V2RayServiceManager {
             return false
         }
 
-        if (coreController.isRunning) {
-            Log.w(AppConfig.TAG, "StartCore-Manager: Core already running")
-            return fail(getService(), "core already running")
-        }
-
         val service = getService()
         if (service == null) {
             Log.e(AppConfig.TAG, "StartCore-Manager: Service is null")
             return false
+        }
+        if (coreController.isRunning) {
+            Log.w(AppConfig.TAG, "StartCore-Manager: Core already running; stopping loop to apply new config")
+            VolkvnDebugLog.log(service, "StartCore", "core already running — stop and restart")
+            try {
+                coreController.stopLoop()
+            } catch (e: Exception) {
+                return fail(service, "failed to stop running core before restart", e)
+            }
         }
 
         val assetDir = Utils.userAssetPath(service)
@@ -870,6 +874,13 @@ object V2RayServiceManager {
 
                 AppConfig.MSG_MEASURE_DELAY -> {
                     measureV2rayDelay()
+                }
+
+                AppConfig.MSG_VOLKVVN_SIMPLE_VERIFY -> {
+                    val service = serviceControl.getService()
+                    watchdogScope.launch {
+                        VolkvnSimpleModeConnectOrchestrator.verifyAfterStart(service)
+                    }
                 }
             }
 

@@ -1,15 +1,21 @@
 package com.v2ray.ang.handler
 
 import android.content.Context
+import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
+import com.v2ray.ang.util.MessageUtil
 import com.v2ray.ang.extension.toast
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 /**
  * Simple-mode connect pipeline: network probe → prepare → start → verify (Dahusim BaseService sequence).
  */
 object VolkvnSimpleModeConnectOrchestrator {
+
+    private const val CORE_RUNNING_WAIT_MS = 15_000L
+    private const val CORE_RUNNING_POLL_MS = 100L
 
     suspend fun connect(context: Context, startVpn: () -> Unit): Boolean = withContext(Dispatchers.IO) {
         val reach = VolkvnSimpleModeNetwork.probeAndApply(context)
@@ -53,7 +59,7 @@ object VolkvnSimpleModeConnectOrchestrator {
     }
 
     suspend fun verifyAfterStart(context: Context): Boolean = withContext(Dispatchers.IO) {
-        if (!V2RayServiceManager.isRunning()) {
+        if (!waitForCoreRunning()) {
             VolkvnDebugLog.simpleModeLog("9", "verify_skip_not_running")
             return@withContext false
         }
@@ -62,8 +68,17 @@ object VolkvnSimpleModeConnectOrchestrator {
             return@withContext false
         }
         VolkvnDebugLog.simpleModeLog("9", "verify_start guidLen=${guid.length}")
-        VolkvnVpnExitProbe.clearCache()
+        if (MmkvManager.getVpnExitProbeProfileId() != guid) {
+            VolkvnVpnExitProbe.clearCache()
+        }
         VolkvnVpnExitProbe.probeAndStore(guid)
+        if (VolkvnWhitelistRuRouting.shouldRouteRuGeoViaProxy(guid)) {
+            VolkvnDebugLog.simpleModeLog("9", "verify_wl_ru_routing_restart")
+            withContext(Dispatchers.Main) {
+                MessageUtil.sendMsg2Service(context, AppConfig.MSG_STATE_RESTART, "")
+            }
+            return@withContext true
+        }
         val speedConfig = V2rayConfigManager.getV2rayConfig4Speedtest(context, guid)
         if (!speedConfig.status) {
             VolkvnDebugLog.simpleModeLog("9", "verify_config_failed")
@@ -109,5 +124,14 @@ object VolkvnSimpleModeConnectOrchestrator {
             return true
         }
         return false
+    }
+
+    private suspend fun waitForCoreRunning(): Boolean {
+        var waited = 0L
+        while (!V2RayServiceManager.isRunning() && waited < CORE_RUNNING_WAIT_MS) {
+            delay(CORE_RUNNING_POLL_MS)
+            waited += CORE_RUNNING_POLL_MS
+        }
+        return V2RayServiceManager.isRunning()
     }
 }

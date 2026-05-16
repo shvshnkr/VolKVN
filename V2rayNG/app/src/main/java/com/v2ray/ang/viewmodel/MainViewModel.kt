@@ -34,7 +34,6 @@ import com.v2ray.ang.handler.VolkvnAgentDebug
 import com.v2ray.ang.handler.VolkvnBuiltinBootstrap
 import com.v2ray.ang.handler.VolkvnServerSelector
 import com.v2ray.ang.handler.PrepareForConnectResult
-import com.v2ray.ang.handler.VolkvnSimpleModeConnectOrchestrator
 import com.v2ray.ang.util.MessageUtil
 import com.v2ray.ang.util.Utils
 import kotlinx.coroutines.CoroutineScope
@@ -578,12 +577,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val guid = MmkvManager.getSelectServer()
                     val volkvnPool = guid != null &&
                         guid in VolkvnBuiltinBootstrap.mergePublicAndBuiltinGuids()
-                    viewModelScope.launch(Dispatchers.IO) {
-                        if (volkvnPool) {
-                            VolkvnSimpleModeConnectOrchestrator.verifyAfterStart(app)
-                        } else {
-                            guid?.let { VolkvnServerSelector.markConnected(it) }
-                        }
+                    if (volkvnPool) {
+                        // verify uses local SOCKS + core state; only valid in :RunSoLibV2RayDaemon (see MainViewModel H77).
+                        MessageUtil.sendMsg2Service(app, AppConfig.MSG_VOLKVVN_SIMPLE_VERIFY, "")
+                    } else {
+                        guid?.let { VolkvnServerSelector.markConnected(it) }
                     }
                 }
 
