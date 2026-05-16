@@ -19,6 +19,16 @@ class VolkvnWhitelistRuRoutingTest {
     }
 
     @Test
+    fun detectsRuGeoDirectBypassRule_geositeCategoryRu() {
+        val item = RulesetItem(
+            outboundTag = AppConfig.TAG_DIRECT,
+            domain = listOf("geosite:category-ru"),
+            enabled = true,
+        )
+        assertTrue(VolkvnWhitelistRuRouting.isRuGeoDirectBypassRule(item))
+    }
+
+    @Test
     fun detectsRuGeoDirectBypassRule_geoipRu() {
         val item = RulesetItem(
             outboundTag = AppConfig.TAG_DIRECT,

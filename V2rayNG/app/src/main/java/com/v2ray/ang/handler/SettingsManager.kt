@@ -124,6 +124,38 @@ object SettingsManager {
     }
 
     /**
+     * Ensures [RoutingType.WHITE_RUSSIA] RU direct bypass rules exist (geosite category-ru / geoip ru).
+     * Used by simple mode so [VolkvnWhitelistRuRouting] can flip them to proxy on WL + RU exit.
+     */
+    fun ensureVolkvnRuBypassRoutingRules(context: Context) {
+        val preset = getPresetRoutingRulesets(context, index = 4) ?: return
+        val current = MmkvManager.decodeRoutingRulesets()
+        if (current.isNullOrEmpty()) {
+            MmkvManager.encodeRoutingRulesets(preset)
+            VolkvnDebugLog.log(
+                context,
+                ANG_PACKAGE,
+                "ru_routing: seeded white_russia preset (${preset.size} rules)",
+            )
+            return
+        }
+        if (current.any { VolkvnWhitelistRuRouting.isRuGeoDirectBypassRule(it) }) {
+            VolkvnDebugLog.log(context, ANG_PACKAGE, "ru_routing: RU bypass rules already present")
+            return
+        }
+        val ruRules = preset.filter { VolkvnWhitelistRuRouting.isRuGeoDirectBypassRule(it) }
+        if (ruRules.isEmpty()) return
+        val merged = current.toMutableList()
+        merged.addAll(ruRules)
+        MmkvManager.encodeRoutingRulesets(merged)
+        VolkvnDebugLog.log(
+            context,
+            ANG_PACKAGE,
+            "ru_routing: merged ${ruRules.size} RU bypass rule(s) into existing ruleset",
+        )
+    }
+
+    /**
      * Get a routing ruleset by index.
      * @param index The index of the ruleset.
      * @return The RulesetItem.

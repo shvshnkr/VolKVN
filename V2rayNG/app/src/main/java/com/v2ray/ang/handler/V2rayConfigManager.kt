@@ -630,6 +630,12 @@ object V2rayConfigManager {
                     ?: "AsIs"
 
             val rulesetItems = MmkvManager.decodeRoutingRulesets()
+            val ruBypassCount = rulesetItems?.count { VolkvnWhitelistRuRouting.isRuGeoDirectBypassRule(it) } ?: 0
+            val routeRuViaProxy = VolkvnWhitelistRuRouting.shouldRouteRuGeoViaProxy(MmkvManager.getSelectServer())
+            VolkvnDebugLog.simpleModeLog(
+                "H20",
+                "routing rules=${rulesetItems?.size ?: 0} ruBypass=$ruBypassCount wlRuViaProxy=$routeRuViaProxy",
+            )
             rulesetItems?.forEach { key ->
                 getRoutingUserRule(key, v2rayConfig)
             }

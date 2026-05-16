@@ -306,6 +306,7 @@ object VolkvnVpnBootstrap {
     fun applySimpleModeDefaults(context: Context) {
         ensurePublicPoolSubscription(context)
         VolkvnBuiltinBootstrap.ensureBuiltinHelpers(context)
+        SettingsManager.ensureVolkvnRuBypassRoutingRules(context)
         // false = xray-core built-in TUN (no libhev-socks5-tunnel.so). Hev tunnel requires native libs from compile-hevtun.sh in app/libs — not shipped in this fork.
         MmkvManager.encodeSettings(AppConfig.PREF_USE_HEV_TUNNEL, false)
         MmkvManager.encodeSettings(AppConfig.PREF_PER_APP_PROXY, true)

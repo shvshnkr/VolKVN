@@ -20,7 +20,10 @@ object VolkvnWhitelistRuRouting {
         if (item.outboundTag != AppConfig.TAG_DIRECT) return false
         val d = item.domain?.joinToString(",")?.lowercase().orEmpty()
         val ip = item.ip?.joinToString(",")?.lowercase().orEmpty()
-        return d.contains("geosite:ru") || d.contains("geosite-category-ru") ||
-            ip.contains("geoip:ru") || ip.contains(AppConfig.GEOIP_RU.lowercase())
+        return d.contains("geosite:ru") ||
+            d.contains("geosite:category-ru") ||
+            d.contains("geosite-category-ru") ||
+            ip.contains("geoip:ru") ||
+            ip.contains(AppConfig.GEOIP_RU.lowercase())
     }
 }
