@@ -78,25 +78,15 @@ class SimpleMainActivity : HelperBaseActivity() {
             binding.switchConnect.setOnCheckedChangeListener { _, isChecked ->
                 onConnectSwitch(isChecked)
             }
-            if (running) {
-                val activity = SimpleModeStatusStore.status.value
-                binding.tvStatus.text = activity.ifBlank {
-                    getString(R.string.volkvn_simple_status_on)
-                }
-            } else if (SimpleModeStatusStore.status.value.isBlank()) {
-                binding.tvStatus.text = getString(R.string.volkvn_simple_status_off)
-            }
+            binding.tvStatus.text = resolveStatusText(running, SimpleModeStatusStore.status.value)
         }
 
         lifecycleScope.launch {
             SimpleModeStatusStore.status.collectLatest { line ->
-                if (mainViewModel.isRunning.value == true) {
-                    binding.tvStatus.text = line.ifBlank {
-                        getString(R.string.volkvn_simple_status_on)
-                    }
-                } else if (line.isNotBlank()) {
-                    binding.tvStatus.text = line
-                }
+                binding.tvStatus.text = resolveStatusText(
+                    mainViewModel.isRunning.value == true,
+                    line,
+                )
             }
         }
 
@@ -120,7 +110,6 @@ class SimpleMainActivity : HelperBaseActivity() {
         lifecycleScope.launch {
             VolkvnDefaultUserBootstrap.bootstrapAll(this@SimpleMainActivity)
             VolkvnSimpleModeNetwork.probeAndApply(this@SimpleMainActivity)
-            SimpleModeStatusStore.setFromStringRes(this@SimpleMainActivity, R.string.volkvn_status_refreshing_subs)
             VolkvnVpnBootstrap.refreshServersAndSelectBest(this@SimpleMainActivity)
             SimpleModeStatusStore.clearActivity()
             binding.tvStatus.text = if (MmkvManager.getSelectServer().isNullOrBlank()) {
@@ -341,6 +330,24 @@ class SimpleMainActivity : HelperBaseActivity() {
         } != null
         if (!opened) {
             toast(R.string.volkvn_battery_opt_open_failed)
+        }
+    }
+
+    private fun resolveStatusText(running: Boolean, line: String): String {
+        val connected = getString(R.string.volkvn_simple_status_on)
+        val off = getString(R.string.volkvn_simple_status_off)
+        if (running) {
+            return when {
+                line.isBlank() -> connected
+                SimpleModeStatusStore.isConnectedLabel(line, this) -> connected
+                SimpleModeStatusStore.isStaleWhileConnected(line, this) -> connected
+                else -> line
+            }
+        }
+        return when {
+            line.isBlank() -> off
+            SimpleModeStatusStore.isConnectedLabel(line, this) -> off
+            else -> line
         }
     }
 }

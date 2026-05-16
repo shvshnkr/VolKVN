@@ -24,6 +24,7 @@ import com.v2ray.ang.extension.serializable
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.AngConfigManager
+import com.v2ray.ang.handler.SimpleModeStatusStore
 import com.v2ray.ang.handler.VolkvnDebugLog
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
@@ -573,6 +574,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     isRunning.value = true
                     VolkvnDebugLog.log(getApplication(), "MainVM", "broadcast START_SUCCESS")
                     val app = getApplication<AngApplication>()
+                    SimpleModeStatusStore.setConnected(app)
                     val guid = MmkvManager.getSelectServer()
                     val volkvnPool = guid != null &&
                         guid in VolkvnBuiltinBootstrap.mergePublicAndBuiltinGuids()
@@ -597,6 +599,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 AppConfig.MSG_STATE_STOP_SUCCESS -> {
                     trustDaemonProcessForOptimisticUi = false
                     isRunning.value = false
+                    SimpleModeStatusStore.clearActivity()
                     VolkvnDebugLog.log(getApplication(), "MainVM", "broadcast STOP_SUCCESS")
                 }
 

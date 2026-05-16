@@ -29,7 +29,6 @@ object VolkvnSimpleModeConnectOrchestrator {
         }
         MmkvManager.setAutoConnectPausedUntilGoogle(false)
 
-        SimpleModeStatusStore.setFromStringRes(context, R.string.volkvn_status_refreshing_subs)
         runCatching {
             VolkvnVpnBootstrap.refreshServersAndSelectBest(context, skipPickIfRecent = true)
         }
@@ -54,9 +53,15 @@ object VolkvnSimpleModeConnectOrchestrator {
     }
 
     suspend fun verifyAfterStart(context: Context): Boolean = withContext(Dispatchers.IO) {
-        if (!V2RayServiceManager.isRunning()) return@withContext false
-        val guid = MmkvManager.getSelectServer() ?: return@withContext false
-        SimpleModeStatusStore.setFromStringRes(context, R.string.volkvn_status_verifying)
+        if (!V2RayServiceManager.isRunning()) {
+            VolkvnDebugLog.simpleModeLog("9", "verify_skip_not_running")
+            return@withContext false
+        }
+        val guid = MmkvManager.getSelectServer() ?: run {
+            VolkvnDebugLog.simpleModeLog("9", "verify_skip_no_guid")
+            return@withContext false
+        }
+        VolkvnDebugLog.simpleModeLog("9", "verify_start guidLen=${guid.length}")
         VolkvnVpnExitProbe.clearCache()
         VolkvnVpnExitProbe.probeAndStore(guid)
         val speedConfig = V2rayConfigManager.getV2rayConfig4Speedtest(context, guid)
@@ -75,7 +80,7 @@ object VolkvnSimpleModeConnectOrchestrator {
         }
         VolkvnAutoSelectProbePolicy.recordPostConnectUrlVerified(guid)
         VolkvnServerSelector.markConnected(guid)
-        SimpleModeStatusStore.clearActivity()
+        withContext(Dispatchers.Main) { SimpleModeStatusStore.setConnected(context) }
         VolkvnDebugLog.simpleModeLog("9", "verify_ok delayMs=$delay")
         true
     }

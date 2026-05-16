@@ -126,15 +126,23 @@ object VolkvnVpnBootstrap {
             val merged = StringBuilder()
             val wlRestricted = MmkvManager.isActiveWhitelistRestrictedNetwork()
             val vpnUp = Utils.isVpnTransportActive(context.applicationContext)
-            for (raw in allPoolSourceUrls(context)) {
+            val poolUrls = allPoolSourceUrls(context)
+            poolUrls.forEachIndexed { index, raw ->
+                SimpleModeStatusStore.setProgress(
+                    context,
+                    R.string.volkvn_status_refreshing_subs_progress,
+                    index + 1,
+                    poolUrls.size,
+                )
                 val url = HttpUtil.toIdnUrl(raw.trim())
                 val fetchLink = VolkvnWhitelistSubscriptionFetch.resolveFetchLink(raw.trim(), wlRestricted, vpnUp)
-                val rawBody = HttpUtil.getUrlContent(fetchLink, 30000) ?: continue
+                val rawBody = HttpUtil.getUrlContent(fetchLink, 30000) ?: return@forEachIndexed
                 val body = VolkvnWhitelistSubscriptionFetch.extractSubscriptionBody(rawBody)
                 val lines = body.count { it == '\n' } + 1
                 Log.i(TAG, "Pool URL fetched: $lines lines, ${body.length} bytes -> $url")
                 merged.appendLine(body)
             }
+            SimpleModeStatusStore.flushPendingProgress()
             val text = merged.toString().trim()
             if (text.isEmpty()) {
                 Log.w(TAG, "No subscription content fetched")
@@ -201,7 +209,6 @@ object VolkvnVpnBootstrap {
                         "refresh:selected_failed_health tcp=$selectedHealthyWhenDown real=$selectedRealHealthyWhenDown",
                     )
                 }
-                SimpleModeStatusStore.setFromStringRes(context, R.string.volkvn_status_testing_servers)
                 when (val prep = VolkvnServerSelector.prepareForConnect(context)) {
                     is PrepareForConnectResult.Success -> {
                         MmkvManager.setSelectServer(prep.guid)

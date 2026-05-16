@@ -466,7 +466,10 @@
     <string name="volkvn_simple_status_off">Disconnected</string>
     <string name="volkvn_status_checking_network">Checking network…</string>
     <string name="volkvn_status_refreshing_subs">Updating subscriptions…</string>
+    <string name="volkvn_status_refreshing_subs_progress">Updating list %1$d/%2$d</string>
     <string name="volkvn_status_testing_servers">Testing servers…</string>
+    <string name="volkvn_status_testing_tcp_progress">Testing servers (TCP) %1$d/%2$d</string>
+    <string name="volkvn_status_testing_url_progress">Testing servers (access) %1$d/%2$d</string>
     <string name="volkvn_status_connecting">Connecting…</string>
     <string name="volkvn_status_verifying">Verifying connection…</string>
     <string name="volkvn_status_switching_server">Switching server %1$d/%2$d…</string>

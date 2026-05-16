@@ -455,7 +455,10 @@
     <string name="volkvn_simple_status_off">Отключено</string>
     <string name="volkvn_status_checking_network">Проверка сети…</string>
     <string name="volkvn_status_refreshing_subs">Обновление подписок…</string>
+    <string name="volkvn_status_refreshing_subs_progress">Обновление списка %1$d/%2$d</string>
     <string name="volkvn_status_testing_servers">Проверка серверов…</string>
+    <string name="volkvn_status_testing_tcp_progress">Проверка серверов (TCP) %1$d/%2$d</string>
+    <string name="volkvn_status_testing_url_progress">Проверка серверов (доступ) %1$d/%2$d</string>
     <string name="volkvn_status_connecting">Подключение…</string>
     <string name="volkvn_status_verifying">Проверка доступа…</string>
     <string name="volkvn_status_switching_server">Смена сервера %1$d/%2$d…</string>

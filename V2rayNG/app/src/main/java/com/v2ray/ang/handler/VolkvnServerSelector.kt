@@ -97,12 +97,12 @@ object VolkvnServerSelector {
         val next = queue[nextIndex]
         MmkvManager.setAutoSelectFallbackIndex(nextIndex)
         MmkvManager.setSelectServer(next)
-        SimpleModeStatusStore.setActivity(
-            AngApplication.application.getString(
-                R.string.volkvn_status_switching_server,
-                nextIndex + 1,
-                queue.size,
-            ),
+        SimpleModeStatusStore.setProgress(
+            AngApplication.application,
+            R.string.volkvn_status_switching_server,
+            nextIndex + 1,
+            queue.size,
+            force = true,
         )
         Log.i(TAG, "Fallback advance to $next ($nextIndex/${queue.size})")
         return next
@@ -145,7 +145,6 @@ object VolkvnServerSelector {
             if (forceReason != null) {
                 VolkvnDebugLog.simpleModeLog("25", "full_probe_forced reason=$forceReason")
             }
-            SimpleModeStatusStore.setFromStringRes(context, R.string.volkvn_status_testing_servers)
             val pick = pickBestServerInternal(
                 context,
                 guids,
@@ -216,7 +215,10 @@ object VolkvnServerSelector {
         if (refinedAlive.isNotEmpty()) refinedAlive else alive
     }
 
-    private suspend fun probeGuidsParallel(guids: List<String>): List<Row> = withContext(Dispatchers.IO) {
+    private suspend fun probeGuidsParallel(
+        guids: List<String>,
+        onChunkDone: ((probedInBatch: Int) -> Unit)? = null,
+    ): List<Row> = withContext(Dispatchers.IO) {
         if (guids.isEmpty()) return@withContext emptyList()
         val out = ArrayList<Row>(guids.size)
         for (chunk in guids.chunked(PARALLEL_PROBES)) {
@@ -228,6 +230,7 @@ object VolkvnServerSelector {
                 }.awaitAll().filterNotNull()
             }
             out.addAll(part)
+            onChunkDone?.invoke(chunk.size)
         }
         out
     }
@@ -335,10 +338,15 @@ object VolkvnServerSelector {
         return picked
     }
 
-    private suspend fun urlTestGuids(context: Context, guids: List<String>): Map<String, Long> = coroutineScope {
+    private suspend fun urlTestGuids(
+        context: Context,
+        guids: List<String>,
+        onDone: ((done: Int, total: Int) -> Unit)? = null,
+    ): Map<String, Long> = coroutineScope {
         if (guids.isEmpty()) return@coroutineScope emptyMap()
         val sem = Semaphore(URL_TEST_PARALLELISM)
         val out = mutableMapOf<String, Long>()
+        val completed = java.util.concurrent.atomic.AtomicInteger(0)
         guids.map { guid ->
             async(Dispatchers.IO) {
                 sem.withPermit {
@@ -346,6 +354,8 @@ object VolkvnServerSelector {
                     if (d >= 0) {
                         synchronized(out) { out[guid] = d }
                     }
+                    val done = completed.incrementAndGet()
+                    onDone?.invoke(done, guids.size)
                 }
             }
         }.awaitAll()
@@ -402,22 +412,45 @@ object VolkvnServerSelector {
         val builtinOrdered = VolkvnBuiltinBootstrap.stableGuidOrder().filter { it in pool }
         val restShuffled = pool.filter { it !in builtinOrdered.toSet() }.shuffled()
         val order = builtinOrdered + restShuffled
+        val poolTotal = order.size
 
-        var rows = probeGuidsParallel(order.take(minOf(FIRST_WAVE, order.size)))
+        var tcpProbed = 0
+        fun reportTcpProgress(added: Int, force: Boolean = false) {
+            tcpProbed = (tcpProbed + added).coerceAtMost(poolTotal)
+            SimpleModeStatusStore.setProgress(
+                context,
+                R.string.volkvn_status_testing_tcp_progress,
+                tcpProbed,
+                poolTotal,
+                force = force,
+            )
+        }
+
+        SimpleModeStatusStore.setProgress(
+            context,
+            R.string.volkvn_status_testing_tcp_progress,
+            0,
+            poolTotal,
+            force = true,
+        )
+
+        var rows = probeGuidsParallel(order.take(minOf(FIRST_WAVE, order.size))) { reportTcpProgress(it) }
         var alive = rows.filter { it.latency < Long.MAX_VALUE }.sortedBy { it.latency }
 
         if (alive.isEmpty() && order.size > FIRST_WAVE) {
             val rest = order.drop(FIRST_WAVE).take(minOf(SECOND_WAVE, order.size - FIRST_WAVE))
-            rows = probeGuidsParallel(rest)
+            rows = probeGuidsParallel(rest) { reportTcpProgress(it) }
             alive = rows.filter { it.latency < Long.MAX_VALUE }.sortedBy { it.latency }
         }
         if (alive.size < MIN_ALIVE_AFTER_TWO_WAVES && order.size > FIRST_WAVE + SECOND_WAVE) {
             val tail = order.drop(FIRST_WAVE + SECOND_WAVE)
             if (tail.isNotEmpty()) {
-                val tailRows = probeGuidsParallel(tail)
+                val tailRows = probeGuidsParallel(tail) { reportTcpProgress(it) }
                 alive = (alive + tailRows.filter { it.latency < Long.MAX_VALUE }).sortedBy { it.latency }
             }
         }
+        reportTcpProgress(0, force = true)
+        SimpleModeStatusStore.flushPendingProgress()
         if (alive.isNotEmpty()) {
             alive = refineTopCandidates(alive)
         }
@@ -438,7 +471,22 @@ object VolkvnServerSelector {
             .take(if (networkHandoff) 4 else URL_TEST_EXTRA_TCP)
             .toList()
         val urlCandidates = (baseUrlBatch + extraTcpBatch).distinct()
-        val urlDelays = urlTestGuids(context, urlCandidates).toMutableMap()
+        val urlTotal = urlCandidates.size.coerceAtLeast(1)
+        SimpleModeStatusStore.setProgress(
+            context,
+            R.string.volkvn_status_testing_url_progress,
+            0,
+            urlTotal,
+            force = true,
+        )
+        val urlDelays = urlTestGuids(context, urlCandidates) { done, total ->
+            SimpleModeStatusStore.setProgress(
+                context,
+                R.string.volkvn_status_testing_url_progress,
+                done,
+                total,
+            )
+        }.toMutableMap()
 
         val missing = urlCandidates
             .filter { it !in urlDelays.keys }
@@ -446,6 +494,14 @@ object VolkvnServerSelector {
         if (missing.isNotEmpty()) {
             urlDelays.putAll(urlTestGuids(context, missing))
         }
+        SimpleModeStatusStore.setProgress(
+            context,
+            R.string.volkvn_status_testing_url_progress,
+            urlTotal,
+            urlTotal,
+            force = true,
+        )
+        SimpleModeStatusStore.flushPendingProgress()
 
         urlDelays.forEach { (g, d) ->
             if (d >= 0L) {
