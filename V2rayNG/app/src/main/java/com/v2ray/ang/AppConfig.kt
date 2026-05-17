@@ -66,6 +66,8 @@ object AppConfig {
     const val PREF_AUTO_SELECT_LAST_PROBE_WHITELIST_ONLY = "pref_auto_select_last_probe_whitelist_only"
     const val PREF_AUTO_SELECT_LAST_KNOWN_GOOD_URL_AT = "pref_auto_select_last_known_good_url_at"
     const val PREF_AUTO_SELECT_LAST_KNOWN_GOOD_URL_PROFILE = "pref_auto_select_last_known_good_url_profile"
+    const val PREF_AUTO_SELECT_LAST_PREPARE_AT = "pref_auto_select_last_prepare_at"
+    const val PREF_AUTO_SELECT_LAST_PREPARE_POOL_HASH = "pref_auto_select_last_prepare_pool_hash"
     const val PREF_VPN_EXIT_PROBE_PROFILE_ID = "pref_vpn_exit_probe_profile_id"
     const val PREF_VPN_EXIT_IS_RUSSIA = "pref_vpn_exit_is_russia"
     const val PREF_VOLKVN_DEFAULT_SUBS_BOOTSTRAPPED = "pref_volkvn_default_subs_bootstrapped"

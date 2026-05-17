@@ -38,6 +38,8 @@ object VolkvnServerSelector {
     private const val SECOND_WAVE = 72
     private const val MIN_ALIVE_AFTER_TWO_WAVES = 5
     private const val PARALLEL_PROBES = 20
+    private const val TAIL_PROBE_MAX = 256
+    private const val TAIL_PROBE_CHUNK = 48
     private const val TOP_RECHECK_COUNT = 10
     private const val TOP_RECHECK_ATTEMPTS = 3
     private const val UNHEALTHY_COOLDOWN_MS = 20 * 60 * 1000L
@@ -155,11 +157,17 @@ object VolkvnServerSelector {
                 return@withLock PrepareForConnectResult.AllProbesDead
             }
             VolkvnAutoSelectProbePolicy.recordFullProbe(guids, whitelistBuiltinOnly)
+            VolkvnAutoSelectProbePolicy.recordPrepareCompleted(guids)
             PrepareForConnectResult.Success(pick)
         } catch (e: CancellationException) {
             VolkvnDebugLog.simpleModeLog("31", "prepare_aborted")
             throw e
         }
+    }
+
+    private fun storedDelaySortKey(guid: String): Long {
+        val delay = MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: 0L
+        return if (delay > 0L) delay else Long.MAX_VALUE
     }
 
     private fun tcpLatencyMs(host: String?, port: Int): Long {
@@ -443,10 +451,21 @@ object VolkvnServerSelector {
             alive = rows.filter { it.latency < Long.MAX_VALUE }.sortedBy { it.latency }
         }
         if (alive.size < MIN_ALIVE_AFTER_TWO_WAVES && order.size > FIRST_WAVE + SECOND_WAVE) {
-            val tail = order.drop(FIRST_WAVE + SECOND_WAVE)
-            if (tail.isNotEmpty()) {
-                val tailRows = probeGuidsParallel(tail) { reportTcpProgress(it) }
+            val tailCandidates = order.drop(FIRST_WAVE + SECOND_WAVE)
+                .sortedBy { storedDelaySortKey(it) }
+                .take(TAIL_PROBE_MAX)
+            var tailProbed = 0
+            for (chunk in tailCandidates.chunked(TAIL_PROBE_CHUNK)) {
+                if (alive.size >= MIN_ALIVE_AFTER_TWO_WAVES) break
+                val tailRows = probeGuidsParallel(chunk) { reportTcpProgress(it) }
+                tailProbed += chunk.size
                 alive = (alive + tailRows.filter { it.latency < Long.MAX_VALUE }).sortedBy { it.latency }
+            }
+            if (tailCandidates.isNotEmpty()) {
+                VolkvnDebugLog.simpleModeLog(
+                    "25",
+                    "tail_probe capped=${tailCandidates.size} probed=$tailProbed alive=${alive.size}",
+                )
             }
         }
         reportTcpProgress(0, force = true)

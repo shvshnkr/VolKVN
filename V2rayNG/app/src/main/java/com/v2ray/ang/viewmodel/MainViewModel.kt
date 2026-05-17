@@ -95,7 +95,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             "queryServiceRunningState vpnMode=${SettingsManager.isVpnMode()} trustDaemon=$trustDaemonProcessForOptimisticUi vpnUp=$vpnUp runningLive=${isRunning.value} ${Utils.vpnUiDiagnostics(app)}",
         )
         if (vpnUp) {
-            isRunning.value = true
+            if (isRunning.value != true) {
+                isRunning.value = true
+            }
         } else if (SettingsManager.isVpnMode() && isRunning.value == true && !transportActive) {
             maybeAutoRecoverConnection("query running=true but transport down")
         }

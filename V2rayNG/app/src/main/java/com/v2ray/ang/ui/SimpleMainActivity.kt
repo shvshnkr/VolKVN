@@ -256,7 +256,10 @@ class SimpleMainActivity : HelperBaseActivity() {
             if (needRefresh) {
                 preconnectRefreshInProgress = true
                 runCatching {
-                    VolkvnVpnBootstrap.refreshServersAndSelectBest(this@SimpleMainActivity)
+                    VolkvnVpnBootstrap.refreshServersAndSelectBest(
+                        this@SimpleMainActivity,
+                        skipPrepare = true,
+                    )
                 }.onFailure {
                     VolkvnDebugLog.log(
                         this@SimpleMainActivity,

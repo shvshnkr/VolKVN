@@ -229,6 +229,8 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     fun restartV2Ray(reason: String = "manual") {
         val runningLive = mainViewModel.isRunning.value == true
         val coreRunning = V2RayServiceManager.isRunning()
+        val transportActive = Utils.isVpnTransportActive(this)
+        val shouldStop = runningLive || coreRunning || transportActive
         // #region agent log
         VolkvnAgentDebug.emit(
             this,
@@ -239,11 +241,13 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
                 "reason" to reason,
                 "runningLive" to runningLive,
                 "coreRunning" to coreRunning,
+                "transportActive" to transportActive,
+                "shouldStop" to shouldStop,
                 "diagnostics" to Utils.vpnUiDiagnostics(this),
             ),
         )
         // #endregion
-        if (runningLive) {
+        if (shouldStop) {
             V2RayServiceManager.stopVService(this)
         }
         lifecycleScope.launch {

@@ -15,6 +15,8 @@ import com.v2ray.ang.AppConfig.PREF_AUTO_SELECT_LAST_FULL_PROBE_AT
 import com.v2ray.ang.AppConfig.PREF_AUTO_SELECT_LAST_KNOWN_GOOD
 import com.v2ray.ang.AppConfig.PREF_AUTO_SELECT_LAST_KNOWN_GOOD_URL_AT
 import com.v2ray.ang.AppConfig.PREF_AUTO_SELECT_LAST_KNOWN_GOOD_URL_PROFILE
+import com.v2ray.ang.AppConfig.PREF_AUTO_SELECT_LAST_PREPARE_AT
+import com.v2ray.ang.AppConfig.PREF_AUTO_SELECT_LAST_PREPARE_POOL_HASH
 import com.v2ray.ang.AppConfig.PREF_AUTO_SELECT_LAST_PROBE_WHITELIST_ONLY
 import com.v2ray.ang.AppConfig.PREF_AUTO_SELECT_PROXY_ID_SET_HASH
 import com.v2ray.ang.AppConfig.PREF_SIMPLE_MODE_USE_WHITELIST_BUILTIN_POOL_ONLY
@@ -820,6 +822,20 @@ object MmkvManager {
         } else {
             encodeSettings(PREF_AUTO_SELECT_LAST_KNOWN_GOOD_URL_PROFILE, guid)
         }
+    }
+
+    fun getAutoSelectLastPrepareAt(): Long =
+        decodeSettingsLong(PREF_AUTO_SELECT_LAST_PREPARE_AT, 0L)
+
+    fun setAutoSelectLastPrepareAt(ms: Long) {
+        encodeSettings(PREF_AUTO_SELECT_LAST_PREPARE_AT, ms)
+    }
+
+    fun getAutoSelectLastPreparePoolHash(): Long =
+        decodeSettingsLong(PREF_AUTO_SELECT_LAST_PREPARE_POOL_HASH, 0L)
+
+    fun setAutoSelectLastPreparePoolHash(hash: Long) {
+        encodeSettings(PREF_AUTO_SELECT_LAST_PREPARE_POOL_HASH, hash)
     }
 
     fun getVpnExitProbeProfileId(): String? =

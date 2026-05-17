@@ -83,7 +83,11 @@ object VolkvnVpnBootstrap {
      * - [pickBestServer] runs when selection is blank or no longer in the imported pool; dead nodes
      *   are still handled via [VolkvnServerSelector.markServerUnhealthy], watchdog, and auto-recover.
      */
-    suspend fun refreshServersAndSelectBest(context: Context, skipPickIfRecent: Boolean = false) = refreshMutex.withLock {
+    suspend fun refreshServersAndSelectBest(
+        context: Context,
+        skipPickIfRecent: Boolean = false,
+        skipPrepare: Boolean = false,
+    ) = refreshMutex.withLock {
         withContext(Dispatchers.IO) {
             val reach = VolkvnSimpleModeNetwork.probeAndApply(context, fast = true)
             if (!reach.hasInternet) {
@@ -170,8 +174,12 @@ object VolkvnVpnBootstrap {
             // #endregion
             val selected = MmkvManager.getSelectServer()
             val guids = MmkvManager.decodeServerList(subId)
-            val mergedPoolGuids = VolkvnBuiltinBootstrap.mergePublicAndBuiltinGuids().toSet()
-            val selectedInPool = selected != null && selected in mergedPoolGuids
+            val mergedPoolGuids = VolkvnBuiltinBootstrap.mergePublicAndBuiltinGuids()
+            val mergedPoolGuidSet = mergedPoolGuids.toSet()
+            if (skipPrepare) {
+                VolkvnAutoSelectProbePolicy.syncProxyIdSetHash(mergedPoolGuids)
+            }
+            val selectedInPool = selected != null && selected in mergedPoolGuidSet
             val selectedHealthyWhenDown =
                 if (!vpnUp && selectedInPool) VolkvnServerSelector.isServerTcpHealthy(context, selected, attempts = 2) else true
             val selectedRealHealthyWhenDown =
@@ -192,7 +200,7 @@ object VolkvnVpnBootstrap {
                     data = mapOf(
                     "importCount" to count,
                     "guidsSize" to guids.size,
-                    "mergedPoolSize" to mergedPoolGuids.size,
+                    "mergedPoolSize" to mergedPoolGuidSet.size,
                     "selectedPresent" to !selected.isNullOrBlank(),
                     "selectedInPool" to selectedInPool,
                     "vpnUp" to vpnUp,
@@ -202,7 +210,9 @@ object VolkvnVpnBootstrap {
                 ),
             )
             // #endregion
-            if (needPick) {
+            if (needPick && skipPrepare) {
+                VolkvnDebugLog.log(context, TAG, "refresh: defer prepare to connect pipeline")
+            } else if (needPick) {
                 if (!selected.isNullOrBlank() && selectedInPool && (!selectedHealthyWhenDown || !selectedRealHealthyWhenDown)) {
                     VolkvnServerSelector.markServerUnhealthy(
                         selected,

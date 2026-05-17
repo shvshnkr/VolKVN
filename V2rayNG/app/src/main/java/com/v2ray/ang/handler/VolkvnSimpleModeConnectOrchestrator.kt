@@ -16,6 +16,7 @@ object VolkvnSimpleModeConnectOrchestrator {
 
     private const val CORE_RUNNING_WAIT_MS = 15_000L
     private const val CORE_RUNNING_POLL_MS = 100L
+    private const val CONNECT_REFRESH_SKIP_MS = 30_000L
 
     suspend fun connect(context: Context, startVpn: () -> Unit): Boolean = withContext(Dispatchers.IO) {
         val reach = VolkvnSimpleModeNetwork.probeAndApply(context)
@@ -35,8 +36,16 @@ object VolkvnSimpleModeConnectOrchestrator {
         }
         MmkvManager.setAutoConnectPausedUntilGoogle(false)
 
-        runCatching {
-            VolkvnVpnBootstrap.refreshServersAndSelectBest(context, skipPickIfRecent = true)
+        val lastPoolRefresh = MmkvManager.decodeSettingsLong(AppConfig.PREF_VOLKVN_LAST_POOL_REFRESH_AT, 0L)
+        val now = System.currentTimeMillis()
+        if (now - lastPoolRefresh >= CONNECT_REFRESH_SKIP_MS) {
+            runCatching {
+                VolkvnVpnBootstrap.refreshServersAndSelectBest(
+                    context,
+                    skipPickIfRecent = true,
+                    skipPrepare = true,
+                )
+            }
         }
 
         when (val prep = VolkvnServerSelector.prepareForConnect(context)) {
@@ -71,14 +80,6 @@ object VolkvnSimpleModeConnectOrchestrator {
         if (MmkvManager.getVpnExitProbeProfileId() != guid) {
             VolkvnVpnExitProbe.clearCache()
         }
-        VolkvnVpnExitProbe.probeAndStore(guid)
-        if (VolkvnWhitelistRuRouting.shouldRouteRuGeoViaProxy(guid)) {
-            VolkvnDebugLog.simpleModeLog("9", "verify_wl_ru_routing_restart")
-            withContext(Dispatchers.Main) {
-                MessageUtil.sendMsg2Service(context, AppConfig.MSG_STATE_RESTART, "")
-            }
-            return@withContext true
-        }
         val speedConfig = V2rayConfigManager.getV2rayConfig4Speedtest(context, guid)
         if (!speedConfig.status) {
             VolkvnDebugLog.simpleModeLog("9", "verify_config_failed")
@@ -92,6 +93,14 @@ object VolkvnSimpleModeConnectOrchestrator {
         if (delay < 0) {
             VolkvnDebugLog.simpleModeLog("9", "verify_url_test_failed")
             return@withContext tryRecover(context, guid)
+        }
+        VolkvnVpnExitProbe.probeAndStore(guid)
+        if (VolkvnWhitelistRuRouting.shouldRouteRuGeoViaProxy(guid)) {
+            VolkvnDebugLog.simpleModeLog("9", "verify_wl_ru_routing_restart")
+            withContext(Dispatchers.Main) {
+                MessageUtil.sendMsg2Service(context, AppConfig.MSG_STATE_RESTART, "")
+            }
+            return@withContext true
         }
         VolkvnAutoSelectProbePolicy.recordPostConnectUrlVerified(guid)
         VolkvnServerSelector.markConnected(guid)

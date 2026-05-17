@@ -7,6 +7,19 @@ object VolkvnAutoSelectProbePolicy {
 
     private const val FULL_PROBE_INTERVAL_MS = 18L * 60 * 60 * 1000
     private const val LAST_KNOWN_GOOD_URL_STALE_MS = 48L * 60 * 60 * 1000
+    const val PREPARE_COOLDOWN_MS = 90_000L
+
+    internal fun suppressRepeatPrepareReasons(
+        now: Long,
+        lastPrepareAt: Long,
+        poolHash: Long,
+        lastPreparePoolHash: Long,
+        cooldownMs: Long = PREPARE_COOLDOWN_MS,
+    ): Boolean =
+        lastPrepareAt > 0L &&
+            now - lastPrepareAt < cooldownMs &&
+            lastPreparePoolHash != 0L &&
+            poolHash == lastPreparePoolHash
 
     fun computeProxyIdSetHash(guids: Collection<String>): Long {
         var hash = 1L
@@ -29,8 +42,14 @@ object VolkvnAutoSelectProbePolicy {
         }
         val hash = computeProxyIdSetHash(guids)
         val storedHash = MmkvManager.getAutoSelectProxyIdSetHash()
+        val suppressRepeat = suppressRepeatPrepareReasons(
+            now = now,
+            lastPrepareAt = MmkvManager.getAutoSelectLastPrepareAt(),
+            poolHash = hash,
+            lastPreparePoolHash = MmkvManager.getAutoSelectLastPreparePoolHash(),
+        )
         if (!networkHandoff) {
-            if (storedHash != 0L && hash != storedHash) {
+            if (!suppressRepeat && storedHash != 0L && hash != storedHash) {
                 reasons += "proxy_set_changed"
             }
             if (MmkvManager.wasAutoSelectLastProbeWhitelistOnly() && !whitelistBuiltinOnly) {
@@ -44,7 +63,7 @@ object VolkvnAutoSelectProbePolicy {
             val stale = verifiedAt == 0L ||
                 verifiedProfile != goodId ||
                 now - verifiedAt >= LAST_KNOWN_GOOD_URL_STALE_MS
-            if (stale) {
+            if (!suppressRepeat && stale) {
                 reasons += "last_known_good_stale"
             }
         }
@@ -60,5 +79,17 @@ object VolkvnAutoSelectProbePolicy {
     fun recordPostConnectUrlVerified(guid: String) {
         MmkvManager.setAutoSelectLastKnownGoodUrlAt(System.currentTimeMillis())
         MmkvManager.setAutoSelectLastKnownGoodUrlProfile(guid)
+    }
+
+    fun recordPrepareCompleted(guids: Collection<String>) {
+        val now = System.currentTimeMillis()
+        val hash = computeProxyIdSetHash(guids)
+        MmkvManager.setAutoSelectLastPrepareAt(now)
+        MmkvManager.setAutoSelectLastPreparePoolHash(hash)
+    }
+
+    /** After pool import without prepare — keeps hash in sync so the next prepare is not spurious. */
+    fun syncProxyIdSetHash(guids: Collection<String>) {
+        MmkvManager.setAutoSelectProxyIdSetHash(computeProxyIdSetHash(guids))
     }
 }
